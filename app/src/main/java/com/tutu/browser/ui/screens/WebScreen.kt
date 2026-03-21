@@ -52,6 +52,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -586,15 +588,18 @@ fun WebScreen(
     
     // CRITICAL FIX: Lifecycle observer to counteract Chromium's internal ActivityLifecycleCallbacks
     // This is the definitive fix for background audio stopping when app is minimized
-    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-    DisposableEffect(backgroundPlayEnabled, lifecycleOwner) {
-        if (!backgroundPlayEnabled) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(backgroundPlayEnabled, lifecycleOwner, webView) {
+        if (!backgroundPlayEnabled || webView == null) {
             return@DisposableEffect onDispose {}
         }
+        
+        Log.d("WebScreen", "Installing lifecycle observer for background play")
         
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             when (event) {
                 androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> {
+                    Log.d("WebScreen", "ON_PAUSE - scheduling counteraction")
                     // Mechanism 1: Explicit webView.onPause() calls
                     // BackgroundAwareWebView already blocks these
                     
@@ -603,15 +608,16 @@ fun WebScreen(
                     webView?.post {
                         (webView as? BackgroundAwareWebView)?.let { bwv ->
                             if (bwv.backgroundPlayEnabled) {
-                                Log.d("WebScreen", "Counteracting Chromium's internal pause")
+                                Log.d("WebScreen", "Counteracting Chromium's internal pause NOW")
                                 bwv.onResume()
                                 bwv.resumeTimers()
+                                Log.d("WebScreen", "Counteraction complete")
                             }
                         }
                     }
                 }
                 androidx.lifecycle.Lifecycle.Event.ON_RESUME -> {
-                    // Normal resume - let WebView handle it naturally
+                    Log.d("WebScreen", "ON_RESUME")
                 }
                 else -> {}
             }
@@ -620,6 +626,7 @@ fun WebScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
         
         onDispose {
+            Log.d("WebScreen", "Removing lifecycle observer")
             lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }

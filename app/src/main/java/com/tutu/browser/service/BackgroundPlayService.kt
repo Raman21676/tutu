@@ -53,7 +53,10 @@ class BackgroundPlayService : Service() {
     private var wakeLock: PowerManager.WakeLock? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        android.util.Log.d("BackgroundPlayService", "onStartCommand: ${intent?.action}")
+        
         if (intent?.action == ACTION_STOP) {
+            android.util.Log.d("BackgroundPlayService", "Stopping service")
             stopSelf()
             return START_NOT_STICKY
         }
@@ -71,8 +74,10 @@ class BackgroundPlayService : Service() {
             "TutuBrowser::BackgroundAudio"
         )
         wakeLock?.acquire(3600000L) // 1 hour max
+        android.util.Log.d("BackgroundPlayService", "WakeLock acquired")
 
         startForeground(NOTIFICATION_ID, createNotification())
+        android.util.Log.d("BackgroundPlayService", "Foreground service started with notification")
         return START_STICKY
     }
 
