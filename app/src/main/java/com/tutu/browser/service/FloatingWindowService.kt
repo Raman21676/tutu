@@ -160,12 +160,34 @@ class FloatingWindowService : Service() {
             loadUrl(url)
         }
 
+        // Maximize button — open in full app (left of close button)
+        val maximizeBtn = ImageButton(this).apply {
+            setImageResource(android.R.drawable.ic_menu_crop)
+            setBackgroundColor(0xCC000000.toInt())
+            setPadding(4, 4, 4, 4)
+            setOnClickListener {
+                // Open MainActivity with current URL
+                val intent = Intent(this@FloatingWindowService, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    putExtra("restore_url", url)
+                }
+                startActivity(intent)
+                stopSelf()
+            }
+        }
+
         // Close button — top-right corner (scaled down)
         val closeBtn = ImageButton(this).apply {
             setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
             setBackgroundColor(0xCC000000.toInt())
             setPadding(4, 4, 4, 4)
             setOnClickListener { stopSelf() }
+        }
+
+        // Maximize button params (left of close button)
+        val maximizeBtnParams = FrameLayout.LayoutParams(40, 40).apply {
+            gravity = Gravity.TOP or Gravity.END
+            rightMargin = 40 // Space for close button
         }
 
         // Close button: scaled down to match smaller window (80x80 -> 40x40)
@@ -177,6 +199,7 @@ class FloatingWindowService : Service() {
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.MATCH_PARENT
         ))
+        container.addView(maximizeBtn, maximizeBtnParams)
 
         // Drag handle — transparent strip at top for moving window
         val dragHandle = View(this).apply {
