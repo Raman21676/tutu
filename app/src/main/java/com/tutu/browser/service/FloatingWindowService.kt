@@ -65,6 +65,12 @@ class FloatingWindowService : Service() {
         // Remove from any existing parent first
         (wv.parent as? ViewGroup)?.removeView(wv)
         
+        // Resume WebView rendering after detaching from Activity
+        wv.onResume()
+        wv.resumeTimers()
+        wv.requestLayout()
+        wv.invalidate()
+        
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         
         // Build container with WebView and close button
@@ -94,11 +100,16 @@ class FloatingWindowService : Service() {
         floatingView = container
         windowManager?.addView(container, params)
         
-        // Unmute video
-        wv.evaluateJavascript(
-            "document.querySelectorAll('video').forEach(v=>{v.muted=false;v.volume=1.0;});",
-            null
-        )
+        // Force WebView to redraw after attaching to window
+        wv.post {
+            wv.requestLayout()
+            wv.invalidate()
+            // Unmute video
+            wv.evaluateJavascript(
+                "document.querySelectorAll('video').forEach(v=>{v.muted=false;v.volume=1.0;});",
+                null
+            )
+        }
     }
 
     private fun buildContainer(wv: WebView): FrameLayout {
