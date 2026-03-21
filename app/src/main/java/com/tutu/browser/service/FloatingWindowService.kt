@@ -158,15 +158,16 @@ class FloatingWindowService : Service() {
             loadUrl(url)
         }
 
-        // Close button — top-right corner
+        // Close button — top-right corner (scaled down)
         val closeBtn = ImageButton(this).apply {
             setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
             setBackgroundColor(0xCC000000.toInt())
-            setPadding(8, 8, 8, 8)
+            setPadding(4, 4, 4, 4)
             setOnClickListener { stopSelf() }
         }
 
-        val closeBtnParams = FrameLayout.LayoutParams(80, 80).apply {
+        // Close button: scaled down to match smaller window (80x80 -> 40x40)
+        val closeBtnParams = FrameLayout.LayoutParams(40, 40).apply {
             gravity = Gravity.TOP or Gravity.END
         }
 
@@ -184,8 +185,9 @@ class FloatingWindowService : Service() {
             WindowManager.LayoutParams.TYPE_PHONE
         }
 
+        // Window size: half of original (800x500 -> 400x250)
         val params = WindowManager.LayoutParams(
-            800, 500,
+            400, 250,
             type,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
