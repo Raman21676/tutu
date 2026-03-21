@@ -9,4 +9,5 @@ import android.webkit.WebView
 object WebViewHolder {
     var webView: WebView? = null
     var backgroundPlayEnabled: Boolean = false
+    var floatingWindowEnabled: Boolean = false
 }

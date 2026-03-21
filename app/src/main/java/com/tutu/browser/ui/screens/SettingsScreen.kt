@@ -31,6 +31,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -38,6 +41,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -59,6 +63,8 @@ fun SettingsScreen(
     val settings by viewModel.settings.collectAsState()
     val clearDataSuccess by viewModel.clearDataSuccess.collectAsState()
     var showClearDataDialog by remember { mutableStateOf(false) }
+    var showOverlayPermissionDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
     
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -135,9 +141,24 @@ fun SettingsScreen(
             
             ToggleSwitch(
                 checked = settings.floatingWindow,
-                onCheckedChange = { viewModel.setFloatingWindow(it) },
+                onCheckedChange = { enabled ->
+                    if (enabled) {
+                        // Check for overlay permission before enabling
+                        if (Settings.canDrawOverlays(context)) {
+                            viewModel.setFloatingWindow(true)
+                        } else {
+                            showOverlayPermissionDialog = true
+                        }
+                    } else {
+                        viewModel.setFloatingWindow(false)
+                    }
+                },
                 title = "Floating Window",
-                subtitle = if (settings.backgroundPlayback) "Disabled (Background Playback is on)" else "Video plays in a floating window",
+                subtitle = when {
+                    settings.backgroundPlayback -> "Disabled (Background Playback is on)"
+                    !Settings.canDrawOverlays(context) -> "Requires 'Draw over apps' permission"
+                    else -> "Video plays in a floating window"
+                },
                 icon = Icons.Default.PictureInPicture,
                 enabled = !settings.backgroundPlayback
             )
@@ -243,6 +264,35 @@ fun SettingsScreen(
             confirmButton = {
                 TextButton(onClick = { viewModel.onClearDataAcknowledged() }) {
                     Text("OK")
+                }
+            }
+        )
+    }
+    
+    // Overlay Permission Dialog
+    if (showOverlayPermissionDialog) {
+        AlertDialog(
+            onDismissRequest = { showOverlayPermissionDialog = false },
+            title = { Text("Permission Required") },
+            text = { Text("Floating Window requires 'Draw over other apps' permission. Please enable it in Settings.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showOverlayPermissionDialog = false
+                        // Open system settings to grant permission
+                        val intent = Intent(
+                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            Uri.parse("package:${context.packageName}")
+                        )
+                        context.startActivity(intent)
+                    }
+                ) {
+                    Text("Open Settings")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showOverlayPermissionDialog = false }) {
+                    Text("Cancel")
                 }
             }
         )

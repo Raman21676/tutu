@@ -142,6 +142,9 @@ class MainActivity : ComponentActivity() {
                 android.util.Log.d("MainActivity", "WebView resume fired after delay")
             }, 50)
             startBackgroundPlayService(currentUrl, currentTitle)
+        } else if (WebViewHolder.floatingWindowEnabled && isInWebScreen) {
+            // Start floating window when app is minimized
+            startFloatingWindowService(currentUrl, currentTitle)
         }
     }
     
@@ -336,9 +339,10 @@ private fun TutuNavigation(
                 onWebViewStateChanged(state.url, state.title)
             }
             
-            // Get background playback setting
+            // Get settings
             val settings by settingsRepository.settings.collectAsState(initial = null)
             val backgroundPlayback = settings?.backgroundPlayback ?: false
+            val floatingWindow = settings?.floatingWindow ?: false
             
             WebScreen(
                 viewModel = viewModel,
@@ -346,7 +350,8 @@ private fun TutuNavigation(
                 onNavigateHome = {
                     navController.popBackStack(Screen.Home.route, inclusive = false)
                 },
-                backgroundPlayEnabled = backgroundPlayback
+                backgroundPlayEnabled = backgroundPlayback,
+                floatingWindowEnabled = floatingWindow
             )
         }
         

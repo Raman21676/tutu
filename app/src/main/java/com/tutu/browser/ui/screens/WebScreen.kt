@@ -79,6 +79,7 @@ fun WebScreen(
     onNavigateHome: () -> Unit,
     pipEnabled: Boolean = false,
     backgroundPlayEnabled: Boolean = false,
+    floatingWindowEnabled: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.state.collectAsState()
@@ -554,9 +555,10 @@ fun WebScreen(
     
     // Background play handling with foreground service
     // CRITICAL: This must be outside the Scaffold to work properly
-    DisposableEffect(backgroundPlayEnabled, webView) {
-        // Update WebViewHolder whenever backgroundPlayEnabled changes
+    DisposableEffect(backgroundPlayEnabled, floatingWindowEnabled, webView) {
+        // Update WebViewHolder whenever settings change
         com.tutu.browser.util.WebViewHolder.backgroundPlayEnabled = backgroundPlayEnabled
+        com.tutu.browser.util.WebViewHolder.floatingWindowEnabled = floatingWindowEnabled
         if (webView != null) {
             com.tutu.browser.util.WebViewHolder.webView = webView
         }
