@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#1C1B1F</color>
+    <color name="coral_red">#F25C54</color>
+    
+    <!-- Splash Screen colors -->
+    <color name="splash_background">#1C1B1F</color>
+    <color name="splash_icon_background">#1C1B1F</color>
+</resources>

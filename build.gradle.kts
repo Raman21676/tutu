@@ -1,0 +1,12 @@
+// Top-level build file
+plugins {
+    id("com.android.application") version "8.2.2" apply false
+    id("org.jetbrains.kotlin.android") version "1.9.22" apply false
+}
+
+buildscript {
+    extra.apply {
+        set("compose_bom_version", "2024.02.00")
+        set("kotlin_version", "1.9.22")
+    }
+}

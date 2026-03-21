@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#CC000000"
+    android:clipChildren="true"
+    android:elevation="8dp">
+
+    <!-- Main container -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <!-- Header / Title bar -->
+        <LinearLayout
+            android:id="@+id/floating_header"
+            android:layout_width="match_parent"
+            android:layout_height="32dp"
+            android:background="#FF4CAF50"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="8dp"
+            android:paddingEnd="4dp">
+
+            <!-- App icon -->
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@mipmap/ic_launcher_foreground"
+                android:contentDescription="App icon" />
+
+            <!-- Title -->
+            <TextView
+                android:id="@+id/floating_title"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:text="TuTu Browser"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                tools:ignore="RtlSymmetry" />
+
+            <!-- Pause button -->
+            <ImageButton
+                android:id="@+id/btn_pause"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:background="@android:color/transparent"
+                android:contentDescription="Pause"
+                android:padding="4dp"
+                android:scaleType="centerInside"
+                android:src="@android:drawable/ic_media_pause"
+                tools:ignore="TouchTargetSizeCheck" />
+
+            <!-- Expand button -->
+            <ImageButton
+                android:id="@+id/btn_expand"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:background="@android:color/transparent"
+                android:contentDescription="Expand"
+                android:padding="4dp"
+                android:scaleType="centerInside"
+                android:src="@android:drawable/arrow_up_float"
+                tools:ignore="TouchTargetSizeCheck" />
+
+            <!-- Close button -->
+            <ImageButton
+                android:id="@+id/btn_close"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:background="@android:color/transparent"
+                android:contentDescription="Close"
+                android:padding="4dp"
+                android:scaleType="centerInside"
+                android:src="@android:drawable/ic_menu_close_clear_cancel"
+                tools:ignore="TouchTargetSizeCheck" />
+
+        </LinearLayout>
+
+        <!-- WebView container -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <WebView
+                android:id="@+id/floating_webview"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
+            <!-- Loading indicator -->
+            <ProgressBar
+                android:id="@+id/floating_progress"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:visibility="gone" />
+
+        </FrameLayout>
+
+        <!-- Resize handle hint -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="4dp"
+            android:background="#FF4CAF50"
+            android:alpha="0.5" />
+
+    </LinearLayout>
+
+    <!-- Border overlay for visual separation -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/floating_window_border"
+        android:clickable="false"
+        android:focusable="false" />
+
+</FrameLayout>
