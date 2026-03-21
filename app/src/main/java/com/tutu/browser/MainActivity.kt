@@ -249,20 +249,20 @@ private fun TutuNavigation(
         }
     }
     
-    // Restore last web URL on launch (for session persistence when app is killed)
-    LaunchedEffect(Unit) {
-        settingsRepository.settings.collect { settings ->
-            val savedUrl = settings.lastUrl
-            if (!savedUrl.isNullOrEmpty() && initialUrl == null) {
-                val encoded = URLEncoder.encode(savedUrl, StandardCharsets.UTF_8.toString())
-                navController.navigate(Screen.Web.createRoute(encoded)) {
-                    launchSingleTop = true
-                }
-            }
-            // Only collect once
-            return@collect
-        }
-    }
+    // DISABLED: Auto-restore last URL was causing issues
+    // Users can manually navigate to their desired website from Home screen
+    // LaunchedEffect(Unit) {
+    //     settingsRepository.settings.collect { settings ->
+    //         val savedUrl = settings.lastUrl
+    //         if (!savedUrl.isNullOrEmpty() && initialUrl == null) {
+    //             val encoded = URLEncoder.encode(savedUrl, StandardCharsets.UTF_8.toString())
+    //             navController.navigate(Screen.Web.createRoute(encoded)) {
+    //                 launchSingleTop = true
+    //             }
+    //         }
+    //         return@collect
+    //     }
+    // }
     
     NavHost(
         navController = navController,

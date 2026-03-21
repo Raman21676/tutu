@@ -535,6 +535,9 @@ fun WebScreen(
                 modifier = Modifier.fillMaxSize(),
                 update = { wv ->
                     webView = wv
+                    // Update WebViewHolder whenever the view updates
+                    com.tutu.browser.util.WebViewHolder.webView = wv
+                    com.tutu.browser.util.WebViewHolder.backgroundPlayEnabled = backgroundPlayEnabled
                     // Don't reload - WebView manages its own navigation.
                     // SPA changes are handled via doUpdateVisitedHistory.
                 }
@@ -552,6 +555,12 @@ fun WebScreen(
     // Background play handling with foreground service
     // CRITICAL: This must be outside the Scaffold to work properly
     DisposableEffect(backgroundPlayEnabled, webView) {
+        // Update WebViewHolder whenever backgroundPlayEnabled changes
+        com.tutu.browser.util.WebViewHolder.backgroundPlayEnabled = backgroundPlayEnabled
+        if (webView != null) {
+            com.tutu.browser.util.WebViewHolder.webView = webView
+        }
+        
         val serviceIntent = Intent(context, BackgroundPlayService::class.java)
         
         if (backgroundPlayEnabled) {
