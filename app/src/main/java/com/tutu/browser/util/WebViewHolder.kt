@@ -10,4 +10,5 @@ object WebViewHolder {
     var webView: WebView? = null
     var backgroundPlayEnabled: Boolean = false
     var floatingWindowEnabled: Boolean = false
+    var currentUrl: String = ""
 }

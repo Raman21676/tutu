@@ -144,7 +144,12 @@ class MainActivity : ComponentActivity() {
             startBackgroundPlayService(currentUrl, currentTitle)
         } else if (WebViewHolder.floatingWindowEnabled && isInWebScreen) {
             // Start floating window when app is minimized
-            startFloatingWindowService(currentUrl, currentTitle)
+            val holderUrl = WebViewHolder.currentUrl
+            val url = if (holderUrl.isNotBlank()) holderUrl else currentUrl
+            Log.d(TAG, "onPause: Starting floating window service - url: $url")
+            startFloatingWindowService(url, currentTitle)
+        } else {
+            Log.d(TAG, "onPause: Not starting floating window. floatingEnabled: ${WebViewHolder.floatingWindowEnabled}, isInWebScreen: $isInWebScreen")
         }
     }
     
@@ -177,11 +182,9 @@ class MainActivity : ComponentActivity() {
     }
     
     private fun startFloatingWindowService(url: String, title: String) {
-        Log.d(TAG, "Starting FloatingWindowService")
+        Log.d(TAG, "Starting FloatingWindowService with url: $url")
         val intent = Intent(this, FloatingWindowService::class.java).apply {
-            action = FloatingWindowService.ACTION_START
-            putExtra("url", url)
-            putExtra("title", title)
+            putExtra(FloatingWindowService.EXTRA_URL, url)
         }
         
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -203,12 +206,7 @@ class MainActivity : ComponentActivity() {
         }
         
         // Stop floating window service
-        if (FloatingWindowService.isRunning) {
-            val intent = Intent(this, FloatingWindowService::class.java).apply {
-                action = FloatingWindowService.ACTION_STOP
-            }
-            startService(intent)
-        }
+        stopService(Intent(this, FloatingWindowService::class.java))
     }
     
     private fun checkOverlayPermission(): Boolean {

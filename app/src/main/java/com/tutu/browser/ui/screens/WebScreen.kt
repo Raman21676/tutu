@@ -274,6 +274,8 @@ fun WebScreen(
                         // Store reference for MainActivity to access synchronously
                         com.tutu.browser.util.WebViewHolder.webView = this
                         com.tutu.browser.util.WebViewHolder.backgroundPlayEnabled = backgroundPlayEnabled
+                        com.tutu.browser.util.WebViewHolder.floatingWindowEnabled = floatingWindowEnabled
+                        com.tutu.browser.util.WebViewHolder.currentUrl = state.url
                         
                         // CRITICAL FIX: Force hardware rendering for SPA navigation
                         setLayerType(View.LAYER_TYPE_HARDWARE, null)
@@ -539,6 +541,8 @@ fun WebScreen(
                     // Update WebViewHolder whenever the view updates
                     com.tutu.browser.util.WebViewHolder.webView = wv
                     com.tutu.browser.util.WebViewHolder.backgroundPlayEnabled = backgroundPlayEnabled
+                    com.tutu.browser.util.WebViewHolder.floatingWindowEnabled = floatingWindowEnabled
+                    com.tutu.browser.util.WebViewHolder.currentUrl = state.url
                     // Don't reload - WebView manages its own navigation.
                     // SPA changes are handled via doUpdateVisitedHistory.
                 }
@@ -562,6 +566,7 @@ fun WebScreen(
         if (webView != null) {
             com.tutu.browser.util.WebViewHolder.webView = webView
         }
+        Log.d("WebScreen", "WebViewHolder updated - bgPlay: $backgroundPlayEnabled, floating: $floatingWindowEnabled")
         
         val serviceIntent = Intent(context, BackgroundPlayService::class.java)
         
