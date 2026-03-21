@@ -54,6 +54,18 @@ class SettingsViewModel(
         }
     }
     
+    fun setBackgroundPlayback(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setBackgroundPlayback(enabled)
+        }
+    }
+    
+    fun setFloatingWindow(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setFloatingWindow(enabled)
+        }
+    }
+    
     fun clearData() {
         viewModelScope.launch {
             settingsRepository.clearAll()

@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -42,6 +43,7 @@ fun ToggleSwitch(
     enabled: Boolean = true,
     icon: ImageVector? = null,
     title: String = "",
+    subtitle: String? = null,
     checkedColor: Color = CoralRed,
     uncheckedColor: Color = MaterialTheme.colorScheme.surfaceVariant
 ) {
@@ -63,6 +65,9 @@ fun ToggleSwitch(
         targetValue = if (checked) checkedColor else uncheckedColor,
         label = "track_color"
     )
+    
+    val textColor = if (enabled) MaterialTheme.colorScheme.onSurface 
+                   else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
     
     Row(
         modifier = modifier
@@ -86,16 +91,25 @@ fun ToggleSwitch(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurface,
+                    tint = textColor,
                     modifier = Modifier.size(24.dp)
                 )
             }
-            if (title.isNotEmpty()) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+            Column {
+                if (title.isNotEmpty()) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = textColor
+                    )
+                }
+                if (!subtitle.isNullOrEmpty()) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else 0.5f)
+                    )
+                }
             }
         }
         
@@ -106,7 +120,7 @@ fun ToggleSwitch(
                 .height(28.dp)
                 .scale(scale)
                 .clip(RoundedCornerShape(14.dp))
-                .background(trackColor)
+                .background(if (enabled) trackColor else uncheckedColor.copy(alpha = 0.5f))
                 .padding(4.dp),
             contentAlignment = Alignment.CenterStart
         ) {
@@ -115,7 +129,7 @@ fun ToggleSwitch(
                     .size(20.dp)
                     .offset(x = thumbPosition.dp)
                     .clip(CircleShape)
-                    .background(Color.White)
+                    .background(Color.White.copy(alpha = if (enabled) 1f else 0.5f))
             )
         }
     }

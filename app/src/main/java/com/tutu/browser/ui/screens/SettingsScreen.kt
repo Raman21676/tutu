@@ -14,6 +14,8 @@ import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.PictureInPicture
 import androidx.compose.material.icons.filled.RememberMe
 import androidx.compose.material.icons.automirrored.filled.RotateRight
 import androidx.compose.material3.AlertDialog
@@ -113,6 +115,31 @@ fun SettingsScreen(
                 onCheckedChange = { viewModel.setRememberChoice(it) },
                 title = stringResource(R.string.dialog_remember_choice),
                 icon = Icons.Default.RememberMe
+            )
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            HorizontalDivider()
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            // Playback Section
+            SectionTitle("Playback")
+            
+            ToggleSwitch(
+                checked = settings.backgroundPlayback,
+                onCheckedChange = { viewModel.setBackgroundPlayback(it) },
+                title = "Background Playback",
+                subtitle = if (settings.floatingWindow) "Disabled (Floating Window is on)" else "Play audio when app is minimized",
+                icon = Icons.Default.MusicNote,
+                enabled = !settings.floatingWindow
+            )
+            
+            ToggleSwitch(
+                checked = settings.floatingWindow,
+                onCheckedChange = { viewModel.setFloatingWindow(it) },
+                title = "Floating Window",
+                subtitle = if (settings.backgroundPlayback) "Disabled (Background Playback is on)" else "Video plays in a floating window",
+                icon = Icons.Default.PictureInPicture,
+                enabled = !settings.backgroundPlayback
             )
             
             Spacer(modifier = Modifier.height(24.dp))
