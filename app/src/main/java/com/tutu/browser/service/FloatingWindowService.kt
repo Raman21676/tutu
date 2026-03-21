@@ -83,8 +83,8 @@ class FloatingWindowService : Service() {
 
         // New WebView — same URL, seeks to saved timestamp
         floatingWebView = WebView(this).apply {
-            // CRITICAL: Force hardware layer for video rendering in Service
-            setLayerType(View.LAYER_TYPE_HARDWARE, null)
+            // CRITICAL: Use software layer for video rendering in Service (Android 7 compatibility)
+            setLayerType(View.LAYER_TYPE_SOFTWARE, null)
             settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true
