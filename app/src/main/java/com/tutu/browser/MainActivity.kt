@@ -184,10 +184,9 @@ class MainActivity : ComponentActivity() {
     }
     
     private fun startFloatingWindowService(url: String, title: String) {
-        Log.d(TAG, "Starting FloatingWindowService with url: $url")
-        val intent = Intent(this, FloatingWindowService::class.java).apply {
-            putExtra(FloatingWindowService.EXTRA_URL, url)
-        }
+        Log.d(TAG, "Starting FloatingWindowService")
+        // WebView is obtained from WebViewHolder, no need to pass URL
+        val intent = Intent(this, FloatingWindowService::class.java)
         
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(intent)

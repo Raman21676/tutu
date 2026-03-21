@@ -14,28 +14,26 @@ import android.os.IBinder
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
-import android.webkit.WebChromeClient
-import android.webkit.WebSettings
 import android.webkit.WebView
-import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.ImageButton
 import androidx.core.app.NotificationCompat
 import com.tutu.browser.MainActivity
 import com.tutu.browser.R
+import com.tutu.browser.util.WebViewHolder
 
 class FloatingWindowService : Service() {
 
     companion object {
-        const val EXTRA_URL = "extra_url"
         const val CHANNEL_ID = "tutu_floating_window"
         const val NOTIFICATION_ID = 1002
     }
 
     private var windowManager: WindowManager? = null
     private var floatingView: View? = null
-    private var floatingWebView: WebView? = null
+    private var webView: WebView? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -45,146 +43,28 @@ class FloatingWindowService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val url = intent?.getStringExtra(EXTRA_URL) ?: "https://www.youtube.com"
-
-        startForeground(NOTIFICATION_ID, buildNotification())
-        showFloatingWindow(url)
-
+        // Get the existing WebView from WebViewHolder
+        val wv = WebViewHolder.webView
+        if (wv != null) {
+            attachWebView(wv)
+            startForeground(NOTIFICATION_ID, buildNotification())
+        } else {
+            stopSelf()
+        }
         return START_NOT_STICKY
     }
 
-    @SuppressLint("ClickableViewAccessibility", "SetJavaScriptEnabled")
-    private fun showFloatingWindow(url: String) {
+    @SuppressLint("ClickableViewAccessibility")
+    private fun attachWebView(wv: WebView) {
+        webView = wv
+        
+        // Remove from any existing parent first
+        (wv.parent as? ViewGroup)?.removeView(wv)
+        
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
-
-        // Root container
-        val container = FrameLayout(this)
-        container.setBackgroundColor(0xFF000000.toInt())
-
-        // WebView inside the floating window
-        floatingWebView = WebView(this).apply {
-            settings.apply {
-                javaScriptEnabled = true
-                domStorageEnabled = true
-                mediaPlaybackRequiresUserGesture = false
-                loadWithOverviewMode = true
-                useWideViewPort = true
-                cacheMode = WebSettings.LOAD_DEFAULT
-                mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-                userAgentString = "Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.144 Mobile Safari/537.36"
-                // Ensure audio plays
-                setMediaPlaybackRequiresUserGesture(false)
-            }
-            webViewClient = object : WebViewClient() {
-                override fun onPageFinished(view: WebView?, url: String?) {
-                    super.onPageFinished(view, url)
-                    // Inject CSS to hide YouTube UI elements - show only video
-                    view?.evaluateJavascript(
-                        """
-                        (function() {
-                            var style = document.createElement('style');
-                            style.textContent = `
-                                /* Hide YouTube header, search, navigation */
-                                #masthead-container, .ytd-masthead,
-                                .ytp-chrome-top, .ytp-show-cards-title,
-                                .ytp-title, .ytp-title-channel,
-                                .ytp-gradient-top, .ytp-gradient-bottom,
-                                #related, #comments, #secondary,
-                                .ytd-watch-flexy #secondary,
-                                .ytd-watch-flexy #related,
-                                .ytd-comments,
-                                #ticket-shelf, #merch-shelf,
-                                #header, #search-container,
-                                .ytp-pause-overlay,
-                                .ytp-watermark,
-                                .annotation,
-                                .video-annotations,
-                                .iv-branding,
-                                .ytp-chrome-bottom .ytp-button:not(.ytp-play-button):not(.ytp-mute-button):not(.ytp-fullscreen-button),
-                                .ytp-settings-menu {
-                                    display: none !important;
-                                    visibility: hidden !important;
-                                    opacity: 0 !important;
-                                }
-                                
-                                /* Make video container fullscreen */
-                                #player-container, .html5-video-player,
-                                .ytd-player, #movie_player,
-                                video {
-                                    width: 100% !important;
-                                    height: 100% !important;
-                                    position: fixed !important;
-                                    top: 0 !important;
-                                    left: 0 !important;
-                                    object-fit: contain !important;
-                                }
-                                
-                                /* Hide body scrollbars */
-                                body {
-                                    overflow: hidden !important;
-                                    background: black !important;
-                                }
-                                
-                                /* Keep video controls visible */
-                                .ytp-chrome-bottom {
-                                    opacity: 1 !important;
-                                    display: block !important;
-                                }
-                            `;
-                            document.head.appendChild(style);
-                            
-                            // Force video to fill screen
-                            var video = document.querySelector('video');
-                            if (video) {
-                                video.style.width = '100%';
-                                video.style.height = '100%';
-                                video.style.objectFit = 'contain';
-                                video.play();
-                            }
-                            
-                            // Hide all elements except player
-                            var allElements = document.body.children;
-                            for (var i = 0; i < allElements.length; i++) {
-                                var el = allElements[i];
-                                if (!el.querySelector('video') && !el.querySelector('#player')) {
-                                    el.style.display = 'none';
-                                }
-                            }
-                            
-                            // Unmute video and set full volume
-                            var video = document.querySelector('video');
-                            if (video) {
-                                video.muted = false;
-                                video.volume = 1.0;
-                            }
-                        })();
-                        """.trimIndent(),
-                        null
-                    )
-                }
-            }
-            webChromeClient = WebChromeClient()
-            loadUrl(url)
-        }
-
-        // Close button — top-right corner
-        val closeBtn = ImageButton(this).apply {
-            setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
-            setBackgroundColor(0xCC000000.toInt())
-            setPadding(8, 8, 8, 8)
-            setOnClickListener { stopSelf() }
-        }
-
-        // Close button: scaled down to match smaller window
-        val closeBtnParams = FrameLayout.LayoutParams(30, 30).apply {
-            gravity = Gravity.TOP or Gravity.END
-        }
-
-        container.addView(floatingWebView, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.MATCH_PARENT
-        ))
-        container.addView(closeBtn, closeBtnParams)
+        
+        // Build container with WebView and close button
+        val container = buildContainer(wv)
 
         // WindowManager layout params
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -194,7 +74,7 @@ class FloatingWindowService : Service() {
             WindowManager.LayoutParams.TYPE_PHONE
         }
 
-        // Window size: one-third + 15% bigger (267x167 -> 307x192)
+        // Window size: 307x192 pixels (15% bigger than one-third)
         val params = WindowManager.LayoutParams(
             307, 192,
             type,
@@ -206,16 +86,57 @@ class FloatingWindowService : Service() {
             y = 200
         }
 
-        // Make the window draggable
-        var initialX = 0; var initialY = 0
-        var initialTouchX = 0f; var initialTouchY = 0f
+        makeDraggable(container, params)
+        floatingView = container
+        windowManager?.addView(container, params)
+        
+        // Unmute video
+        wv.evaluateJavascript(
+            "document.querySelectorAll('video').forEach(v=>{v.muted=false;v.volume=1.0;});",
+            null
+        )
+    }
+
+    private fun buildContainer(wv: WebView): FrameLayout {
+        val container = FrameLayout(this)
+        container.setBackgroundColor(0xFF000000.toInt())
+
+        // Close button — top-right corner (30x30)
+        val closeBtn = ImageButton(this).apply {
+            setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
+            setBackgroundColor(0xCC000000.toInt())
+            setPadding(4, 4, 4, 4)
+            setOnClickListener { stopSelf() }
+        }
+
+        val closeBtnParams = FrameLayout.LayoutParams(30, 30).apply {
+            gravity = Gravity.TOP or Gravity.END
+        }
+
+        container.addView(wv, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        ))
+        container.addView(closeBtn, closeBtnParams)
+
+        return container
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    private fun makeDraggable(container: FrameLayout, params: WindowManager.LayoutParams) {
+        var initialX = 0
+        var initialY = 0
+        var initialTouchX = 0f
+        var initialTouchY = 0f
         var isDragging = false
 
         container.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    initialX = params.x; initialY = params.y
-                    initialTouchX = event.rawX; initialTouchY = event.rawY
+                    initialX = params.x
+                    initialY = params.y
+                    initialTouchX = event.rawX
+                    initialTouchY = event.rawY
                     isDragging = false
                     true
                 }
@@ -236,14 +157,15 @@ class FloatingWindowService : Service() {
                 else -> false
             }
         }
-
-        floatingView = container
-        windowManager?.addView(container, params)
     }
 
     override fun onDestroy() {
-        floatingWebView?.destroy()
-        floatingView?.let { windowManager?.removeView(it) }
+        // Remove view from WindowManager but DON'T destroy WebView
+        // It belongs to the Activity
+        floatingView?.let {
+            windowManager?.removeView(it)
+        }
+        webView = null
         super.onDestroy()
     }
 
