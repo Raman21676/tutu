@@ -131,17 +131,17 @@ class MainActivity : ComponentActivity() {
     
     override fun onPause() {
         super.onPause()
-        // CRITICAL: super.onPause() triggers WebView's internal pause via
-        // ActivityLifecycleCallbacks. We immediately reverse it synchronously.
-        // post{} does NOT work on Android 7 — the queue is throttled after pause.
         if (WebViewHolder.backgroundPlayEnabled) {
-            Log.d(TAG, "onPause: Resuming WebView synchronously for background play")
-            WebViewHolder.webView?.onResume()
-            WebViewHolder.webView?.resumeTimers()
+            // postDelayed is REQUIRED. Android's internal WebViewChromium.pauseTimers()
+            // is dispatched ~10-30ms AFTER super.onPause() returns.
+            // Calling onResume() synchronously fires before that, so Android pauses it again.
+            // 50ms delay ensures all internal pause machinery is done before we resume.
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                WebViewHolder.webView?.onResume()
+                WebViewHolder.webView?.resumeTimers()
+                android.util.Log.d("MainActivity", "WebView resume fired after delay")
+            }, 50)
             startBackgroundPlayService(currentUrl, currentTitle)
-            Log.d(TAG, "onPause: WebView resumed and service started")
-        } else {
-            Log.d(TAG, "onPause: Background play NOT enabled, not resuming WebView")
         }
     }
     
