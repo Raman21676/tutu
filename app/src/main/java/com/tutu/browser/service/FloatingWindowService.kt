@@ -166,7 +166,8 @@ class FloatingWindowService : Service() {
             setOnClickListener { stopSelf() }
         }
 
-        val closeBtnParams = FrameLayout.LayoutParams(80, 80).apply {
+        // Close button: scaled down to match smaller window
+        val closeBtnParams = FrameLayout.LayoutParams(30, 30).apply {
             gravity = Gravity.TOP or Gravity.END
         }
 
@@ -184,8 +185,9 @@ class FloatingWindowService : Service() {
             WindowManager.LayoutParams.TYPE_PHONE
         }
 
+        // Window size: one-third of original (800x500 -> 267x167)
         val params = WindowManager.LayoutParams(
-            800, 500,
+            267, 167,
             type,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
