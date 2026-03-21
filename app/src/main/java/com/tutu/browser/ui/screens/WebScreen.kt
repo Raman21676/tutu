@@ -261,7 +261,8 @@ fun WebScreen(
         Box(modifier = boxModifier) {
             AndroidView(
                 factory = { ctx ->
-                    WebView(ctx).apply {
+                    BackgroundAwareWebView(ctx).apply {
+                        this.backgroundPlayEnabled = backgroundPlayEnabled
                         // CRITICAL FIX: Force hardware rendering for SPA navigation
                         setLayerType(View.LAYER_TYPE_HARDWARE, null)
                         
@@ -564,55 +565,22 @@ fun WebScreen(
         }
     }
     
-    // WebView lifecycle management
-    // CRITICAL: Use backgroundPlayEnabled as key so the effect recomposes when it changes
+    // Start foreground service when background play is enabled
     DisposableEffect(backgroundPlayEnabled) {
-        val lifecycleObserver = object : androidx.lifecycle.DefaultLifecycleObserver {
-            override fun onPause(owner: androidx.lifecycle.LifecycleOwner) {
-                if (!backgroundPlayEnabled) {
-                    // Normal behavior: pause WebView when app goes to background
-                    webView?.onPause()
-                    webView?.pauseTimers()
-                    Log.d("WebScreen", "WebView paused (background play disabled)")
-                } else {
-                    // CRITICAL FIX: Android automatically pauses the WebView through
-                    // the Activity's view hierarchy — even if we never call onPause() ourselves.
-                    // The only way to counteract this is to immediately call onResume()
-                    // via post{} so it runs right after the automatic pause completes.
-                    webView?.post {
-                        webView?.onResume()
-                        webView?.resumeTimers()
-                        Log.d("WebScreen", "WebView auto-pause counteracted — audio continues")
-                    }
-                }
-            }
-            
-            override fun onResume(owner: androidx.lifecycle.LifecycleOwner) {
-                // Always resume WebView when app comes to foreground
-                webView?.onResume()
-                webView?.resumeTimers()
-                Log.d("WebScreen", "WebView resumed")
-            }
-            
-            override fun onStop(owner: androidx.lifecycle.LifecycleOwner) {
-                // When app is stopped (backgrounded):
-                // - If background play is enabled, keep WebView running
-                // - If background play is disabled, WebView is already paused in onPause
-                if (backgroundPlayEnabled) {
-                    // CRITICAL: resumeTimers() prevents JS freeze which stops audio
-                    webView?.resumeTimers()
-                    Log.d("WebScreen", "App stopped - resumeTimers() called, JS continues running")
-                    // Start foreground service to keep process alive
-                    val intent = Intent(context, BackgroundPlayService::class.java)
-                    ContextCompat.startForegroundService(context, intent)
-                }
-            }
+        val serviceIntent = Intent(context, BackgroundPlayService::class.java)
+        
+        if (backgroundPlayEnabled) {
+            ContextCompat.startForegroundService(context, serviceIntent)
+            Log.d("WebScreen", "Background play service started")
+        } else {
+            context.stopService(serviceIntent)
+            Log.d("WebScreen", "Background play service stopped")
         }
         
-        (context as androidx.lifecycle.LifecycleOwner).lifecycle.addObserver(lifecycleObserver)
-        
         onDispose {
-            (context as androidx.lifecycle.LifecycleOwner).lifecycle.removeObserver(lifecycleObserver)
+            if (!backgroundPlayEnabled) {
+                context.stopService(serviceIntent)
+            }
         }
     }
 }
