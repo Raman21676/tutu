@@ -11,7 +11,6 @@ import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.IBinder
-import android.util.Log
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -25,29 +24,17 @@ import android.widget.ImageButton
 import androidx.core.app.NotificationCompat
 import com.tutu.browser.MainActivity
 import com.tutu.browser.R
-import com.tutu.browser.util.WebViewHolder
 
 class FloatingWindowService : Service() {
 
     companion object {
         const val EXTRA_URL = "extra_url"
-        const val EXTRA_TIMESTAMP = "extra_timestamp"
         const val CHANNEL_ID = "tutu_floating_window"
         const val NOTIFICATION_ID = 1002
-        private const val TAG = "FloatingWindowService"
-        
-        // Hide everything except the video player
-        private val YOUTUBE_MINIMAL_CSS = """
-            (function(){
-                var s=document.createElement('style');
-                s.textContent='ytd-masthead,#masthead-container,ytd-watch-next-secondary-results-renderer,#secondary,ytd-comments,#comments,ytd-app>ytd-page-manager>ytd-watch-flexy #below,paper-tooltip,ytd-engagement-panel-section-list-renderer{display:none!important;}#player-container,#movie_player,video{width:100vw!important;height:100vh!important;max-width:100vw!important;max-height:100vh!important;position:fixed!important;top:0!important;left:0!important;z-index:9999!important;}';
-                document.head.appendChild(s);
-            })();
-        """.trimIndent()
     }
 
     private var windowManager: WindowManager? = null
-    private var floatingView: FrameLayout? = null
+    private var floatingView: View? = null
     private var floatingWebView: WebView? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -58,30 +45,23 @@ class FloatingWindowService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val url = intent?.getStringExtra(EXTRA_URL) ?: WebViewHolder.currentUrl
-        val timestamp = intent?.getLongExtra(EXTRA_TIMESTAMP, 0L) ?: 0L
-
-        if (url.isBlank()) {
-            Log.w(TAG, "No URL provided, stopping")
-            stopSelf()
-            return START_NOT_STICKY
-        }
+        val url = intent?.getStringExtra(EXTRA_URL) ?: "https://www.youtube.com"
 
         startForeground(NOTIFICATION_ID, buildNotification())
-        showFloatingWindow(url, timestamp)
+        showFloatingWindow(url)
+
         return START_NOT_STICKY
     }
 
     @SuppressLint("ClickableViewAccessibility", "SetJavaScriptEnabled")
-    private fun showFloatingWindow(url: String, timestamp: Long) {
-        Log.d(TAG, "Showing floating window: $url at ${timestamp}ms")
-
+    private fun showFloatingWindow(url: String) {
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
 
+        // Root container
         val container = FrameLayout(this)
         container.setBackgroundColor(0xFF000000.toInt())
 
-        // New WebView — same URL, seeks to saved timestamp
+        // WebView inside the floating window
         floatingWebView = WebView(this).apply {
             settings.apply {
                 javaScriptEnabled = true
@@ -93,71 +73,121 @@ class FloatingWindowService : Service() {
                 mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                 userAgentString = "Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.144 Mobile Safari/537.36"
             }
-            webChromeClient = WebChromeClient()
             webViewClient = object : WebViewClient() {
-                override fun onPageFinished(view: WebView, url: String) {
-                    // 1. Hide all YouTube UI — show only video
-                    view.evaluateJavascript(YOUTUBE_MINIMAL_CSS, null)
-                    // 2. Seek to saved timestamp
-                    if (timestamp > 0) {
-                        view.evaluateJavascript(
-                            "setTimeout(function(){" +
-                            "var v=document.querySelector('video');" +
-                            "if(v){v.currentTime=${timestamp / 1000.0};v.play();v.muted=false;v.volume=1.0;}" +
-                            "}, 1500);", null
-                        )
-                    } else {
-                        view.evaluateJavascript(
-                            "setTimeout(function(){" +
-                            "var v=document.querySelector('video');" +
-                            "if(v){v.play();v.muted=false;v.volume=1.0;}" +
-                            "}, 1500);", null
-                        )
-                    }
+                override fun onPageFinished(view: WebView?, url: String?) {
+                    super.onPageFinished(view, url)
+                    // Inject CSS to hide YouTube UI elements - show only video
+                    view?.evaluateJavascript(
+                        """
+                        (function() {
+                            var style = document.createElement('style');
+                            style.textContent = `
+                                /* Hide YouTube header, search, navigation */
+                                #masthead-container, .ytd-masthead,
+                                .ytp-chrome-top, .ytp-show-cards-title,
+                                .ytp-title, .ytp-title-channel,
+                                .ytp-gradient-top, .ytp-gradient-bottom,
+                                #related, #comments, #secondary,
+                                .ytd-watch-flexy #secondary,
+                                .ytd-watch-flexy #related,
+                                .ytd-comments,
+                                #ticket-shelf, #merch-shelf,
+                                #header, #search-container,
+                                .ytp-pause-overlay,
+                                .ytp-watermark,
+                                .annotation,
+                                .video-annotations,
+                                .iv-branding,
+                                .ytp-chrome-bottom .ytp-button:not(.ytp-play-button):not(.ytp-mute-button):not(.ytp-fullscreen-button),
+                                .ytp-settings-menu {
+                                    display: none !important;
+                                    visibility: hidden !important;
+                                    opacity: 0 !important;
+                                }
+                                
+                                /* Make video container fullscreen */
+                                #player-container, .html5-video-player,
+                                .ytd-player, #movie_player,
+                                video {
+                                    width: 100% !important;
+                                    height: 100% !important;
+                                    position: fixed !important;
+                                    top: 0 !important;
+                                    left: 0 !important;
+                                    object-fit: contain !important;
+                                }
+                                
+                                /* Hide body scrollbars */
+                                body {
+                                    overflow: hidden !important;
+                                    background: black !important;
+                                }
+                                
+                                /* Keep video controls visible */
+                                .ytp-chrome-bottom {
+                                    opacity: 1 !important;
+                                    display: block !important;
+                                }
+                            `;
+                            document.head.appendChild(style);
+                            
+                            // Force video to fill screen
+                            var video = document.querySelector('video');
+                            if (video) {
+                                video.style.width = '100%';
+                                video.style.height = '100%';
+                                video.style.objectFit = 'contain';
+                                video.play();
+                            }
+                            
+                            // Hide all elements except player
+                            var allElements = document.body.children;
+                            for (var i = 0; i < allElements.length; i++) {
+                                var el = allElements[i];
+                                if (!el.querySelector('video') && !el.querySelector('#player')) {
+                                    el.style.display = 'none';
+                                }
+                            }
+                        })();
+                        """.trimIndent(),
+                        null
+                    )
                 }
             }
-            val cookieManager = android.webkit.CookieManager.getInstance()
-            cookieManager.setAcceptCookie(true)
-            cookieManager.setAcceptThirdPartyCookies(this, true)
+            webChromeClient = WebChromeClient()
             loadUrl(url)
         }
 
-        // Add WebView to container
+        // Close button — top-right corner
+        val closeBtn = ImageButton(this).apply {
+            setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
+            setBackgroundColor(0xCC000000.toInt())
+            setPadding(8, 8, 8, 8)
+            setOnClickListener { stopSelf() }
+        }
+
+        val closeBtnParams = FrameLayout.LayoutParams(80, 80).apply {
+            gravity = Gravity.TOP or Gravity.END
+        }
+
         container.addView(floatingWebView, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.MATCH_PARENT
         ))
+        container.addView(closeBtn, closeBtnParams)
 
-        // Drag handle — sits on TOP of WebView, intercepts touch in top strip
-        val dragHandle = View(this).apply {
-            setBackgroundColor(0xAA222222.toInt())
-        }
-
-        // Drag handle strip: full width, 28dp tall, at top
-        val handleParams = FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT, 56
-        ).apply { gravity = Gravity.TOP }
-        container.addView(dragHandle, handleParams)
-
-        // Close button on top of drag handle
-        val closeBtn = ImageButton(this).apply {
-            setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
-            setBackgroundColor(0xCC000000.toInt())
-            setPadding(6, 6, 6, 6)
-            setOnClickListener { stopSelf() }
-        }
-        container.addView(closeBtn, FrameLayout.LayoutParams(60, 56).apply {
-            gravity = Gravity.TOP or Gravity.END
-        })
-
-        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+        // WindowManager layout params
+        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-        else @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE
+        } else {
+            @Suppress("DEPRECATION")
+            WindowManager.LayoutParams.TYPE_PHONE
+        }
 
-        // Change flags to allow touch input to reach drag handle
         val params = WindowManager.LayoutParams(
-            307, 192, type,
-            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
+            800, 500,
+            type,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
@@ -165,18 +195,20 @@ class FloatingWindowService : Service() {
             y = 200
         }
 
-        // Touch listener on the drag handle — not the container
-        var ix = 0; var iy = 0; var tx = 0f; var ty = 0f
-        dragHandle.setOnTouchListener { _, event ->
+        // Make the window draggable
+        var initialX = 0; var initialY = 0
+        var initialTouchX = 0f; var initialTouchY = 0f
+
+        container.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    ix = params.x; iy = params.y
-                    tx = event.rawX; ty = event.rawY
+                    initialX = params.x; initialY = params.y
+                    initialTouchX = event.rawX; initialTouchY = event.rawY
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    params.x = ix + (event.rawX - tx).toInt()
-                    params.y = iy + (event.rawY - ty).toInt()
+                    params.x = initialX + (event.rawX - initialTouchX).toInt()
+                    params.y = initialY + (event.rawY - initialTouchY).toInt()
                     windowManager?.updateViewLayout(container, params)
                     true
                 }
@@ -186,29 +218,28 @@ class FloatingWindowService : Service() {
 
         floatingView = container
         windowManager?.addView(container, params)
-        Log.d(TAG, "Floating window added to screen")
     }
 
     override fun onDestroy() {
-        Log.d(TAG, "Destroying floating window")
         floatingWebView?.destroy()
         floatingView?.let { windowManager?.removeView(it) }
-        floatingView = null
-        floatingWebView = null
         super.onDestroy()
     }
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(CHANNEL_ID, "Floating Window",
-                NotificationManager.IMPORTANCE_LOW).apply { setShowBadge(false) }
+            val channel = NotificationChannel(
+                CHANNEL_ID, "Floating Window",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply { setShowBadge(false) }
             (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
                 .createNotificationChannel(channel)
         }
     }
 
     private fun buildNotification(): Notification {
-        val pi = PendingIntent.getActivity(this, 0,
+        val openIntent = PendingIntent.getActivity(
+            this, 0,
             Intent(this, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
             },
@@ -220,7 +251,7 @@ class FloatingWindowService : Service() {
             .setContentTitle("TuTu Browser")
             .setContentText("Floating window active")
             .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentIntent(pi)
+            .setContentIntent(openIntent)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
