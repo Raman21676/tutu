@@ -135,9 +135,13 @@ class MainActivity : ComponentActivity() {
         // ActivityLifecycleCallbacks. We immediately reverse it synchronously.
         // post{} does NOT work on Android 7 — the queue is throttled after pause.
         if (WebViewHolder.backgroundPlayEnabled) {
+            Log.d(TAG, "onPause: Resuming WebView synchronously for background play")
             WebViewHolder.webView?.onResume()
             WebViewHolder.webView?.resumeTimers()
             startBackgroundPlayService(currentUrl, currentTitle)
+            Log.d(TAG, "onPause: WebView resumed and service started")
+        } else {
+            Log.d(TAG, "onPause: Background play NOT enabled, not resuming WebView")
         }
     }
     

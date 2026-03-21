@@ -52,6 +52,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -545,7 +551,7 @@ fun WebScreen(
     
     // Background play handling with foreground service
     // CRITICAL: This must be outside the Scaffold to work properly
-    DisposableEffect(backgroundPlayEnabled) {
+    DisposableEffect(backgroundPlayEnabled, webView) {
         val serviceIntent = Intent(context, BackgroundPlayService::class.java)
         
         if (backgroundPlayEnabled) {
@@ -562,7 +568,34 @@ fun WebScreen(
             Log.d("WebScreen", "Background play service stopped")
         }
         
+        // CRITICAL: Periodically re-inject script to keep overriding YouTube's detection
+        // This handles cases where YouTube's JS re-registers event listeners
+        val scriptJob = if (backgroundPlayEnabled && webView != null) {
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                while (isActive) {
+                    delay(1000) // Every 1 second
+                    webView?.evaluateJavascript(PAGE_VISIBILITY_OVERRIDE_SCRIPT, null)
+                    webView?.evaluateJavascript(
+                        """
+                        (function() {
+                            // Keep video playing
+                            document.querySelectorAll('video').forEach(v => {
+                                if (v.paused && v.currentTime > 0 && !v.ended) {
+                                    v.play();
+                                }
+                                v.muted = false;
+                                v.volume = 1.0;
+                            });
+                        })();
+                        """.trimIndent(),
+                        null
+                    )
+                }
+            }
+        } else null
+        
         onDispose {
+            scriptJob?.cancel()
             if (!backgroundPlayEnabled) {
                 context.stopService(serviceIntent)
             }
