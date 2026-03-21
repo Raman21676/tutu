@@ -35,6 +35,7 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -65,6 +66,13 @@ fun SettingsScreen(
     var showClearDataDialog by remember { mutableStateOf(false) }
     var showOverlayPermissionDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    var hasOverlayPermission by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
+    
+    // Check permission when returning from system settings
+    DisposableEffect(Unit) {
+        hasOverlayPermission = Settings.canDrawOverlays(context)
+        onDispose { }
+    }
     
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -144,7 +152,7 @@ fun SettingsScreen(
                 onCheckedChange = { enabled ->
                     if (enabled) {
                         // Check for overlay permission before enabling
-                        if (Settings.canDrawOverlays(context)) {
+                        if (hasOverlayPermission) {
                             viewModel.setFloatingWindow(true)
                         } else {
                             showOverlayPermissionDialog = true
@@ -156,7 +164,7 @@ fun SettingsScreen(
                 title = "Floating Window",
                 subtitle = when {
                     settings.backgroundPlayback -> "Disabled (Background Playback is on)"
-                    !Settings.canDrawOverlays(context) -> "Requires 'Draw over apps' permission"
+                    !hasOverlayPermission -> "Requires 'Draw over apps' permission"
                     else -> "Video plays in a floating window"
                 },
                 icon = Icons.Default.PictureInPicture,
