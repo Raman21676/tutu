@@ -9,15 +9,16 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
-import android.util.Log
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import android.view.Gravity
 import android.view.MotionEvent
-import android.view.View
-import android.view.ViewGroup
 import android.view.WindowManager
+import android.webkit.WebChromeClient
+import android.webkit.WebSettings
 import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.ImageButton
 import androidx.core.app.NotificationCompat
@@ -28,13 +29,25 @@ import com.tutu.browser.util.WebViewHolder
 class FloatingWindowService : Service() {
 
     companion object {
+        const val EXTRA_URL = "extra_url"
+        const val EXTRA_TIMESTAMP = "extra_timestamp"
         const val CHANNEL_ID = "tutu_floating_window"
         const val NOTIFICATION_ID = 1002
+        private const val TAG = "FloatingWindowService"
+        
+        // Hide everything except the video player
+        private val YOUTUBE_MINIMAL_CSS = """
+            (function(){
+                var s=document.createElement('style');
+                s.textContent='ytd-masthead,#masthead-container,ytd-watch-next-secondary-results-renderer,#secondary,ytd-comments,#comments,ytd-app>ytd-page-manager>ytd-watch-flexy #below,paper-tooltip,ytd-engagement-panel-section-list-renderer{display:none!important;}#player-container,#movie_player,video{width:100vw!important;height:100vh!important;max-width:100vw!important;max-height:100vh!important;position:fixed!important;top:0!important;left:0!important;z-index:9999!important;}';
+                document.head.appendChild(s);
+            })();
+        """.trimIndent()
     }
 
     private var windowManager: WindowManager? = null
-    private var floatingView: View? = null
-    private var webView: WebView? = null
+    private var floatingView: FrameLayout? = null
+    private var floatingWebView: WebView? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -44,50 +57,92 @@ class FloatingWindowService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d("FloatingWindowService", "onStartCommand called")
-        // Get the existing WebView from WebViewHolder
-        val wv = WebViewHolder.webView
-        Log.d("FloatingWindowService", "WebView from holder: $wv")
-        if (wv != null) {
-            attachWebView(wv)
-            startForeground(NOTIFICATION_ID, buildNotification())
-        } else {
-            Log.e("FloatingWindowService", "WebView is null, stopping service")
+        val url = intent?.getStringExtra(EXTRA_URL) ?: WebViewHolder.currentUrl
+        val timestamp = intent?.getLongExtra(EXTRA_TIMESTAMP, 0L) ?: 0L
+
+        if (url.isBlank()) {
+            Log.w(TAG, "No URL provided, stopping")
             stopSelf()
+            return START_NOT_STICKY
         }
+
+        startForeground(NOTIFICATION_ID, buildNotification())
+        showFloatingWindow(url, timestamp)
         return START_NOT_STICKY
     }
 
-    @SuppressLint("ClickableViewAccessibility")
-    private fun attachWebView(wv: WebView) {
-        webView = wv
-        
-        // Remove from any existing parent first
-        (wv.parent as? ViewGroup)?.removeView(wv)
-        
-        // Resume WebView rendering after detaching from Activity
-        wv.onResume()
-        wv.resumeTimers()
-        wv.requestLayout()
-        wv.invalidate()
-        
-        windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        
-        // Build container with WebView and close button
-        val container = buildContainer(wv)
+    @SuppressLint("ClickableViewAccessibility", "SetJavaScriptEnabled")
+    private fun showFloatingWindow(url: String, timestamp: Long) {
+        Log.d(TAG, "Showing floating window: $url at ${timestamp}ms")
 
-        // WindowManager layout params
-        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-        } else {
-            @Suppress("DEPRECATION")
-            WindowManager.LayoutParams.TYPE_PHONE
+        windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+
+        val container = FrameLayout(this)
+        container.setBackgroundColor(0xFF000000.toInt())
+
+        // New WebView — same URL, seeks to saved timestamp
+        floatingWebView = WebView(this).apply {
+            settings.apply {
+                javaScriptEnabled = true
+                domStorageEnabled = true
+                mediaPlaybackRequiresUserGesture = false
+                loadWithOverviewMode = true
+                useWideViewPort = true
+                cacheMode = WebSettings.LOAD_DEFAULT
+                mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                userAgentString = "Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.144 Mobile Safari/537.36"
+            }
+            webChromeClient = WebChromeClient()
+            webViewClient = object : WebViewClient() {
+                override fun onPageFinished(view: WebView, url: String) {
+                    // 1. Hide all YouTube UI — show only video
+                    view.evaluateJavascript(YOUTUBE_MINIMAL_CSS, null)
+                    // 2. Seek to saved timestamp
+                    if (timestamp > 0) {
+                        view.evaluateJavascript(
+                            "setTimeout(function(){" +
+                            "var v=document.querySelector('video');" +
+                            "if(v){v.currentTime=${timestamp / 1000.0};v.play();v.muted=false;v.volume=1.0;}" +
+                            "}, 1500);", null
+                        )
+                    } else {
+                        view.evaluateJavascript(
+                            "setTimeout(function(){" +
+                            "var v=document.querySelector('video');" +
+                            "if(v){v.play();v.muted=false;v.volume=1.0;}" +
+                            "}, 1500);", null
+                        )
+                    }
+                }
+            }
+            val cookieManager = android.webkit.CookieManager.getInstance()
+            cookieManager.setAcceptCookie(true)
+            cookieManager.setAcceptThirdPartyCookies(this, true)
+            loadUrl(url)
         }
 
-        // Window size: 307x192 pixels (15% bigger than one-third)
+        // Close button
+        val closeBtn = ImageButton(this).apply {
+            setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
+            setBackgroundColor(0xCC000000.toInt())
+            setPadding(6, 6, 6, 6)
+            setOnClickListener { stopSelf() }
+        }
+
+        container.addView(floatingWebView, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        ))
+        container.addView(closeBtn, FrameLayout.LayoutParams(60, 60).apply {
+            gravity = Gravity.TOP or Gravity.END
+        })
+
+        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        else @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE
+
         val params = WindowManager.LayoutParams(
-            307, 192,
-            type,
+            307, 192, type,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
         ).apply {
@@ -96,108 +151,46 @@ class FloatingWindowService : Service() {
             y = 200
         }
 
-        makeDraggable(container, params)
-        floatingView = container
-        windowManager?.addView(container, params)
-        
-        // Force WebView to redraw after attaching to window
-        wv.post {
-            wv.requestLayout()
-            wv.invalidate()
-            // Unmute video
-            wv.evaluateJavascript(
-                "document.querySelectorAll('video').forEach(v=>{v.muted=false;v.volume=1.0;});",
-                null
-            )
-        }
-    }
-
-    private fun buildContainer(wv: WebView): FrameLayout {
-        val container = FrameLayout(this)
-        container.setBackgroundColor(0xFF000000.toInt())
-
-        // Close button — top-right corner (30x30)
-        val closeBtn = ImageButton(this).apply {
-            setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
-            setBackgroundColor(0xCC000000.toInt())
-            setPadding(4, 4, 4, 4)
-            setOnClickListener { stopSelf() }
-        }
-
-        val closeBtnParams = FrameLayout.LayoutParams(30, 30).apply {
-            gravity = Gravity.TOP or Gravity.END
-        }
-
-        container.addView(wv, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.MATCH_PARENT
-        ))
-        container.addView(closeBtn, closeBtnParams)
-
-        return container
-    }
-
-    @SuppressLint("ClickableViewAccessibility")
-    private fun makeDraggable(container: FrameLayout, params: WindowManager.LayoutParams) {
-        var initialX = 0
-        var initialY = 0
-        var initialTouchX = 0f
-        var initialTouchY = 0f
-        var isDragging = false
-
+        // Drag support
+        var ix = 0; var iy = 0; var tx = 0f; var ty = 0f
         container.setOnTouchListener { _, event ->
             when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    initialX = params.x
-                    initialY = params.y
-                    initialTouchX = event.rawX
-                    initialTouchY = event.rawY
-                    isDragging = false
-                    true
-                }
+                MotionEvent.ACTION_DOWN -> { ix = params.x; iy = params.y; tx = event.rawX; ty = event.rawY; true }
                 MotionEvent.ACTION_MOVE -> {
-                    val dx = event.rawX - initialTouchX
-                    val dy = event.rawY - initialTouchY
-                    if (kotlin.math.abs(dx) > 10 || kotlin.math.abs(dy) > 10) {
-                        isDragging = true
-                    }
-                    params.x = initialX + dx.toInt()
-                    params.y = initialY + dy.toInt()
+                    params.x = ix + (event.rawX - tx).toInt()
+                    params.y = iy + (event.rawY - ty).toInt()
                     windowManager?.updateViewLayout(container, params)
-                    true
-                }
-                MotionEvent.ACTION_UP -> {
                     true
                 }
                 else -> false
             }
         }
+
+        floatingView = container
+        windowManager?.addView(container, params)
+        Log.d(TAG, "Floating window added to screen")
     }
 
     override fun onDestroy() {
-        // Remove view from WindowManager but DON'T destroy WebView
-        // It belongs to the Activity
-        floatingView?.let {
-            windowManager?.removeView(it)
-        }
-        webView = null
+        Log.d(TAG, "Destroying floating window")
+        floatingWebView?.destroy()
+        floatingView?.let { windowManager?.removeView(it) }
+        floatingView = null
+        floatingWebView = null
         super.onDestroy()
     }
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID, "Floating Window",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply { setShowBadge(false) }
+            val channel = NotificationChannel(CHANNEL_ID, "Floating Window",
+                NotificationManager.IMPORTANCE_LOW).apply { setShowBadge(false) }
             (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
                 .createNotificationChannel(channel)
         }
     }
 
     private fun buildNotification(): Notification {
-        val openIntent = PendingIntent.getActivity(
-            this, 0,
+        val pi = PendingIntent.getActivity(this, 0,
             Intent(this, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
             },
@@ -209,7 +202,7 @@ class FloatingWindowService : Service() {
             .setContentTitle("TuTu Browser")
             .setContentText("Floating window active")
             .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentIntent(openIntent)
+            .setContentIntent(pi)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()

@@ -146,10 +146,8 @@ class MainActivity : ComponentActivity() {
             startBackgroundPlayService(currentUrl, currentTitle)
         } else if (WebViewHolder.floatingWindowEnabled && isInWebScreen) {
             // Start floating window when app is minimized
-            val holderUrl = WebViewHolder.currentUrl
-            val url = if (holderUrl.isNotBlank()) holderUrl else currentUrl
-            Log.d(TAG, "onPause: Starting floating window service - url: $url")
-            startFloatingWindowService(url, currentTitle)
+            Log.d(TAG, "onPause: Starting floating window service")
+            startFloatingWindowService()
         } else {
             Log.d(TAG, "onPause: Not starting floating window. floatingEnabled: ${WebViewHolder.floatingWindowEnabled}, isInWebScreen: $isInWebScreen")
         }
@@ -183,15 +181,23 @@ class MainActivity : ComponentActivity() {
         }
     }
     
-    private fun startFloatingWindowService(url: String, title: String) {
-        Log.d(TAG, "Starting FloatingWindowService")
-        // WebView is obtained from WebViewHolder, no need to pass URL
-        val intent = Intent(this, FloatingWindowService::class.java)
-        
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent)
-        } else {
-            startService(intent)
+    private fun startFloatingWindowService() {
+        Log.d(TAG, "Starting FloatingWindowService with timestamp")
+        // Save current video timestamp via JS before launching floating window
+        WebViewHolder.webView?.evaluateJavascript(
+            "document.querySelector('video')?.currentTime * 1000 || 0"
+        ) { result ->
+            val timestamp = result?.replace("null", "0")?.toDoubleOrNull()?.toLong() ?: 0L
+            val intent = Intent(this, FloatingWindowService::class.java).apply {
+                putExtra(FloatingWindowService.EXTRA_URL, WebViewHolder.currentUrl)
+                putExtra(FloatingWindowService.EXTRA_TIMESTAMP, timestamp)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(intent)
+            } else {
+                startService(intent)
+            }
+            Log.d(TAG, "FloatingWindowService started at ${timestamp}ms")
         }
     }
     
