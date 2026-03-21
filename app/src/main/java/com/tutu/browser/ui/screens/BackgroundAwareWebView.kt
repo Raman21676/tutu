@@ -30,4 +30,12 @@ class BackgroundAwareWebView(context: Context) : WebView(context) {
         // Never tell the WebView the window is invisible.
         // YouTube checks this to decide whether to pause playback.
     }
+
+    override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
+        if (!backgroundPlayEnabled) {
+            super.onWindowFocusChanged(hasWindowFocus)
+        }
+        // Block the "focus lost" signal — Chromium uses this as a secondary
+        // trigger to suspend audio on older Android versions.
+    }
 }

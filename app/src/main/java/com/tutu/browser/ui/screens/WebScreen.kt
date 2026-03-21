@@ -583,6 +583,46 @@ fun WebScreen(
             }
         }
     }
+    
+    // CRITICAL FIX: Lifecycle observer to counteract Chromium's internal ActivityLifecycleCallbacks
+    // This is the definitive fix for background audio stopping when app is minimized
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(backgroundPlayEnabled, lifecycleOwner) {
+        if (!backgroundPlayEnabled) {
+            return@DisposableEffect onDispose {}
+        }
+        
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            when (event) {
+                androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> {
+                    // Mechanism 1: Explicit webView.onPause() calls
+                    // BackgroundAwareWebView already blocks these
+                    
+                    // Mechanism 2: Chromium's internal ActivityLifecycleCallbacks
+                    // These happen AFTER this observer runs. We use post{} to counteract.
+                    webView?.post {
+                        (webView as? BackgroundAwareWebView)?.let { bwv ->
+                            if (bwv.backgroundPlayEnabled) {
+                                Log.d("WebScreen", "Counteracting Chromium's internal pause")
+                                bwv.onResume()
+                                bwv.resumeTimers()
+                            }
+                        }
+                    }
+                }
+                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> {
+                    // Normal resume - let WebView handle it naturally
+                }
+                else -> {}
+            }
+        }
+        
+        lifecycleOwner.lifecycle.addObserver(observer)
+        
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 }
 
 @Composable
