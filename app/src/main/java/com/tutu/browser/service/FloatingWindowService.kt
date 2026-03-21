@@ -73,7 +73,87 @@ class FloatingWindowService : Service() {
                 mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                 userAgentString = "Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.144 Mobile Safari/537.36"
             }
-            webViewClient = WebViewClient()
+            webViewClient = object : WebViewClient() {
+                override fun onPageFinished(view: WebView?, url: String?) {
+                    super.onPageFinished(view, url)
+                    // Inject CSS to hide YouTube UI elements - show only video
+                    view?.evaluateJavascript(
+                        """
+                        (function() {
+                            var style = document.createElement('style');
+                            style.textContent = `
+                                /* Hide YouTube header, search, navigation */
+                                #masthead-container, .ytd-masthead,
+                                .ytp-chrome-top, .ytp-show-cards-title,
+                                .ytp-title, .ytp-title-channel,
+                                .ytp-gradient-top, .ytp-gradient-bottom,
+                                #related, #comments, #secondary,
+                                .ytd-watch-flexy #secondary,
+                                .ytd-watch-flexy #related,
+                                .ytd-comments,
+                                #ticket-shelf, #merch-shelf,
+                                #header, #search-container,
+                                .ytp-pause-overlay,
+                                .ytp-watermark,
+                                .annotation,
+                                .video-annotations,
+                                .iv-branding,
+                                .ytp-chrome-bottom .ytp-button:not(.ytp-play-button):not(.ytp-mute-button):not(.ytp-fullscreen-button),
+                                .ytp-settings-menu {
+                                    display: none !important;
+                                    visibility: hidden !important;
+                                    opacity: 0 !important;
+                                }
+                                
+                                /* Make video container fullscreen */
+                                #player-container, .html5-video-player,
+                                .ytd-player, #movie_player,
+                                video {
+                                    width: 100% !important;
+                                    height: 100% !important;
+                                    position: fixed !important;
+                                    top: 0 !important;
+                                    left: 0 !important;
+                                    object-fit: contain !important;
+                                }
+                                
+                                /* Hide body scrollbars */
+                                body {
+                                    overflow: hidden !important;
+                                    background: black !important;
+                                }
+                                
+                                /* Keep video controls visible */
+                                .ytp-chrome-bottom {
+                                    opacity: 1 !important;
+                                    display: block !important;
+                                }
+                            `;
+                            document.head.appendChild(style);
+                            
+                            // Force video to fill screen
+                            var video = document.querySelector('video');
+                            if (video) {
+                                video.style.width = '100%';
+                                video.style.height = '100%';
+                                video.style.objectFit = 'contain';
+                                video.play();
+                            }
+                            
+                            // Hide all elements except player
+                            var allElements = document.body.children;
+                            for (var i = 0; i < allElements.length; i++) {
+                                var el = allElements[i];
+                                if (!el.querySelector('video') && !el.querySelector('#player')) {
+                                    el.style.display = 'none';
+                                }
+                            }
+                        })();
+                        """.trimIndent(),
+                        null
+                    )
+                }
+            }
             webChromeClient = WebChromeClient()
             loadUrl(url)
         }
