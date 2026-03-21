@@ -131,12 +131,14 @@ class FloatingWindowService : Service() {
                             `;
                             document.head.appendChild(style);
                             
-                            // Force video to fill screen
+                            // Force video to fill screen and unmute
                             var video = document.querySelector('video');
                             if (video) {
                                 video.style.width = '100%';
                                 video.style.height = '100%';
                                 video.style.objectFit = 'contain';
+                                video.muted = false;
+                                video.volume = 1.0;
                                 video.play();
                             }
                             
