@@ -9,6 +9,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
+import android.util.Log
 import android.os.Build
 import android.os.IBinder
 import android.view.Gravity
@@ -43,12 +44,15 @@ class FloatingWindowService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.d("FloatingWindowService", "onStartCommand called")
         // Get the existing WebView from WebViewHolder
         val wv = WebViewHolder.webView
+        Log.d("FloatingWindowService", "WebView from holder: $wv")
         if (wv != null) {
             attachWebView(wv)
             startForeground(NOTIFICATION_ID, buildNotification())
         } else {
+            Log.e("FloatingWindowService", "WebView is null, stopping service")
             stopSelf()
         }
         return START_NOT_STICKY
