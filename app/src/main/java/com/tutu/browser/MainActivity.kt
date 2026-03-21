@@ -38,6 +38,7 @@ import com.tutu.browser.di.AppModule
 import com.tutu.browser.service.BackgroundPlayService
 import com.tutu.browser.service.FloatingWindowService
 import com.tutu.browser.ui.screens.HomeScreen
+import com.tutu.browser.util.WebViewHolder
 import com.tutu.browser.ui.screens.SettingsScreen
 import com.tutu.browser.ui.screens.WebScreen
 import com.tutu.browser.ui.theme.TutuTheme
@@ -63,10 +64,6 @@ class MainActivity : ComponentActivity() {
     private var currentUrl: String = ""
     private var currentTitle: String = ""
     private var isInWebScreen: Boolean = false
-    
-    // Cached settings for synchronous access in onPause()
-    private var cachedBackgroundPlayback: Boolean = false
-    private var cachedFloatingWindow: Boolean = false
     
     // Permission launcher for overlay (Android 11+)
     private val overlayPermissionLauncher = registerForActivityResult(
@@ -120,10 +117,6 @@ class MainActivity : ComponentActivity() {
                         },
                         onScreenChanged = { screen ->
                             isInWebScreen = (screen == Screen.Web.route.substringBefore("/"))
-                        },
-                        onSettingsChanged = { bgPlay, floating ->
-                            cachedBackgroundPlayback = bgPlay
-                            cachedFloatingWindow = floating
                         }
                     )
                 }
@@ -138,22 +131,13 @@ class MainActivity : ComponentActivity() {
     
     override fun onPause() {
         super.onPause()
-        Log.d(TAG, "onPause - isInWebScreen: $isInWebScreen, url: $currentUrl, bgPlay: $cachedBackgroundPlayback")
-        
-        // CRITICAL FIX: Start service SYNCHRONOUSLY before activity pauses
-        // Using a coroutine here was too slow - the WebView would pause before service started
-        if (isInWebScreen && currentUrl.isNotBlank()) {
-            when {
-                cachedBackgroundPlayback -> {
-                    Log.d(TAG, "Starting background play service synchronously")
-                    startBackgroundPlayService(currentUrl, currentTitle)
-                }
-                cachedFloatingWindow -> {
-                    if (checkOverlayPermission()) {
-                        startFloatingWindowService(currentUrl, currentTitle)
-                    }
-                }
-            }
+        // CRITICAL: super.onPause() triggers WebView's internal pause via
+        // ActivityLifecycleCallbacks. We immediately reverse it synchronously.
+        // post{} does NOT work on Android 7 — the queue is throttled after pause.
+        if (WebViewHolder.backgroundPlayEnabled) {
+            WebViewHolder.webView?.onResume()
+            WebViewHolder.webView?.resumeTimers()
+            startBackgroundPlayService(currentUrl, currentTitle)
         }
     }
     
@@ -242,8 +226,7 @@ private fun TutuNavigation(
     bookmarkRepository: com.tutu.browser.data.repository.BookmarkRepository,
     initialUrl: String? = null,
     onWebViewStateChanged: (String, String) -> Unit = { _, _ -> },
-    onScreenChanged: (String) -> Unit = {},
-    onSettingsChanged: (Boolean, Boolean) -> Unit = { _, _ -> }
+    onScreenChanged: (String) -> Unit = {}
 ) {
     val navController = rememberNavController()
     
@@ -251,13 +234,6 @@ private fun TutuNavigation(
     LaunchedEffect(navController.currentBackStackEntryFlow) {
         navController.currentBackStackEntryFlow.collect { entry ->
             onScreenChanged(entry.destination.route ?: "")
-        }
-    }
-    
-    // Cache settings for synchronous access
-    LaunchedEffect(Unit) {
-        settingsRepository.settings.collect { settings ->
-            onSettingsChanged(settings.backgroundPlayback, settings.floatingWindow)
         }
     }
     

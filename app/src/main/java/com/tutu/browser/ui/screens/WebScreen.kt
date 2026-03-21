@@ -52,8 +52,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -265,6 +263,11 @@ fun WebScreen(
                 factory = { ctx ->
                     BackgroundAwareWebView(ctx).apply {
                         this.backgroundPlayEnabled = backgroundPlayEnabled
+                        
+                        // Store reference for MainActivity to access synchronously
+                        com.tutu.browser.util.WebViewHolder.webView = this
+                        com.tutu.browser.util.WebViewHolder.backgroundPlayEnabled = backgroundPlayEnabled
+                        
                         // CRITICAL FIX: Force hardware rendering for SPA navigation
                         setLayerType(View.LAYER_TYPE_HARDWARE, null)
                         
@@ -563,71 +566,10 @@ fun WebScreen(
             if (!backgroundPlayEnabled) {
                 context.stopService(serviceIntent)
             }
-            // If background play is enabled, keep the service running
-        }
-    }
-    
-    // Start foreground service when background play is enabled
-    DisposableEffect(backgroundPlayEnabled) {
-        val serviceIntent = Intent(context, BackgroundPlayService::class.java)
-        
-        if (backgroundPlayEnabled) {
-            ContextCompat.startForegroundService(context, serviceIntent)
-            Log.d("WebScreen", "Background play service started")
-        } else {
-            context.stopService(serviceIntent)
-            Log.d("WebScreen", "Background play service stopped")
-        }
-        
-        onDispose {
+            // Clear WebViewHolder reference when WebScreen is disposed
             if (!backgroundPlayEnabled) {
-                context.stopService(serviceIntent)
+                com.tutu.browser.util.WebViewHolder.webView = null
             }
-        }
-    }
-    
-    // CRITICAL FIX: Lifecycle observer to counteract Chromium's internal ActivityLifecycleCallbacks
-    // This is the definitive fix for background audio stopping when app is minimized
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(backgroundPlayEnabled, lifecycleOwner, webView) {
-        if (!backgroundPlayEnabled || webView == null) {
-            return@DisposableEffect onDispose {}
-        }
-        
-        Log.d("WebScreen", "Installing lifecycle observer for background play")
-        
-        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            when (event) {
-                androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> {
-                    Log.d("WebScreen", "ON_PAUSE - scheduling counteraction")
-                    // Mechanism 1: Explicit webView.onPause() calls
-                    // BackgroundAwareWebView already blocks these
-                    
-                    // Mechanism 2: Chromium's internal ActivityLifecycleCallbacks
-                    // These happen AFTER this observer runs. We use post{} to counteract.
-                    webView?.post {
-                        (webView as? BackgroundAwareWebView)?.let { bwv ->
-                            if (bwv.backgroundPlayEnabled) {
-                                Log.d("WebScreen", "Counteracting Chromium's internal pause NOW")
-                                bwv.onResume()
-                                bwv.resumeTimers()
-                                Log.d("WebScreen", "Counteraction complete")
-                            }
-                        }
-                    }
-                }
-                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> {
-                    Log.d("WebScreen", "ON_RESUME")
-                }
-                else -> {}
-            }
-        }
-        
-        lifecycleOwner.lifecycle.addObserver(observer)
-        
-        onDispose {
-            Log.d("WebScreen", "Removing lifecycle observer")
-            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 }
