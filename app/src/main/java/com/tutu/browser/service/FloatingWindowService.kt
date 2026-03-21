@@ -72,6 +72,8 @@ class FloatingWindowService : Service() {
                 cacheMode = WebSettings.LOAD_DEFAULT
                 mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                 userAgentString = "Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.144 Mobile Safari/537.36"
+                // Ensure audio plays
+                setMediaPlaybackRequiresUserGesture(false)
             }
             webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView?, url: String?) {
@@ -148,6 +150,13 @@ class FloatingWindowService : Service() {
                                     el.style.display = 'none';
                                 }
                             }
+                            
+                            // Unmute video and set full volume
+                            var video = document.querySelector('video');
+                            if (video) {
+                                video.muted = false;
+                                video.volume = 1.0;
+                            }
                         })();
                         """.trimIndent(),
                         null
@@ -185,9 +194,9 @@ class FloatingWindowService : Service() {
             WindowManager.LayoutParams.TYPE_PHONE
         }
 
-        // Window size: one-third of original (800x500 -> 267x167)
+        // Window size: one-third + 15% bigger (267x167 -> 307x192)
         val params = WindowManager.LayoutParams(
-            267, 167,
+            307, 192,
             type,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
@@ -200,18 +209,28 @@ class FloatingWindowService : Service() {
         // Make the window draggable
         var initialX = 0; var initialY = 0
         var initialTouchX = 0f; var initialTouchY = 0f
+        var isDragging = false
 
         container.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
                     initialX = params.x; initialY = params.y
                     initialTouchX = event.rawX; initialTouchY = event.rawY
+                    isDragging = false
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    params.x = initialX + (event.rawX - initialTouchX).toInt()
-                    params.y = initialY + (event.rawY - initialTouchY).toInt()
+                    val dx = event.rawX - initialTouchX
+                    val dy = event.rawY - initialTouchY
+                    if (kotlin.math.abs(dx) > 10 || kotlin.math.abs(dy) > 10) {
+                        isDragging = true
+                    }
+                    params.x = initialX + dx.toInt()
+                    params.y = initialY + dy.toInt()
                     windowManager?.updateViewLayout(container, params)
+                    true
+                }
+                MotionEvent.ACTION_UP -> {
                     true
                 }
                 else -> false
