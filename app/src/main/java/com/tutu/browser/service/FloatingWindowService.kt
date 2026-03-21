@@ -177,6 +177,17 @@ class FloatingWindowService : Service() {
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.MATCH_PARENT
         ))
+
+        // Drag handle — transparent strip at top for moving window
+        val dragHandle = View(this).apply {
+            setBackgroundColor(0x55000000.toInt()) // Semi-transparent black
+        }
+        val dragHandleParams = FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT, 30
+        ).apply {
+            gravity = Gravity.TOP
+        }
+        container.addView(dragHandle, dragHandleParams)
         container.addView(closeBtn, closeBtnParams)
 
         // WindowManager layout params
@@ -199,11 +210,11 @@ class FloatingWindowService : Service() {
             y = 200
         }
 
-        // Make the window draggable
+        // Make the window draggable via drag handle
         var initialX = 0; var initialY = 0
         var initialTouchX = 0f; var initialTouchY = 0f
 
-        container.setOnTouchListener { _, event ->
+        dragHandle.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
                     initialX = params.x; initialY = params.y
