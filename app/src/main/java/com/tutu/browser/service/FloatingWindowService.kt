@@ -14,6 +14,7 @@ import android.os.IBinder
 import android.util.Log
 import android.view.Gravity
 import android.view.MotionEvent
+import android.view.View
 import android.view.WindowManager
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
@@ -82,6 +83,8 @@ class FloatingWindowService : Service() {
 
         // New WebView — same URL, seeks to saved timestamp
         floatingWebView = WebView(this).apply {
+            // CRITICAL: Force hardware layer for video rendering in Service
+            setLayerType(View.LAYER_TYPE_HARDWARE, null)
             settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true
@@ -121,19 +124,31 @@ class FloatingWindowService : Service() {
             loadUrl(url)
         }
 
-        // Close button
+        // Add WebView to container
+        container.addView(floatingWebView, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        ))
+
+        // Drag handle — sits on TOP of WebView, intercepts touch in top strip
+        val dragHandle = View(this).apply {
+            setBackgroundColor(0xAA222222.toInt())
+        }
+
+        // Drag handle strip: full width, 28dp tall, at top
+        val handleParams = FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT, 56
+        ).apply { gravity = Gravity.TOP }
+        container.addView(dragHandle, handleParams)
+
+        // Close button on top of drag handle
         val closeBtn = ImageButton(this).apply {
             setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
             setBackgroundColor(0xCC000000.toInt())
             setPadding(6, 6, 6, 6)
             setOnClickListener { stopSelf() }
         }
-
-        container.addView(floatingWebView, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.MATCH_PARENT
-        ))
-        container.addView(closeBtn, FrameLayout.LayoutParams(60, 60).apply {
+        container.addView(closeBtn, FrameLayout.LayoutParams(60, 56).apply {
             gravity = Gravity.TOP or Gravity.END
         })
 
@@ -141,9 +156,10 @@ class FloatingWindowService : Service() {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
         else @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE
 
+        // Change flags to allow touch input to reach drag handle
         val params = WindowManager.LayoutParams(
             307, 192, type,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
@@ -151,11 +167,15 @@ class FloatingWindowService : Service() {
             y = 200
         }
 
-        // Drag support
+        // Touch listener on the drag handle — not the container
         var ix = 0; var iy = 0; var tx = 0f; var ty = 0f
-        container.setOnTouchListener { _, event ->
+        dragHandle.setOnTouchListener { _, event ->
             when (event.action) {
-                MotionEvent.ACTION_DOWN -> { ix = params.x; iy = params.y; tx = event.rawX; ty = event.rawY; true }
+                MotionEvent.ACTION_DOWN -> {
+                    ix = params.x; iy = params.y
+                    tx = event.rawX; ty = event.rawY
+                    true
+                }
                 MotionEvent.ACTION_MOVE -> {
                     params.x = ix + (event.rawX - tx).toInt()
                     params.y = iy + (event.rawY - ty).toInt()
