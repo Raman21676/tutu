@@ -190,7 +190,33 @@ fun HomeScreen(
         // Floating Window Toggle
         ToggleSwitch(
             checked = settings.floatingWindow,
-            onCheckedChange = { viewModel.setFloatingWindow(it) },
+            onCheckedChange = { enabled ->
+                if (enabled) {
+                    if (android.provider.Settings.canDrawOverlays(context)) {
+                        // Permission already granted — enable it
+                        viewModel.setFloatingWindow(true)
+                        viewModel.setBackgroundPlayback(false)
+                        context.stopService(android.content.Intent(context, com.tutu.browser.service.BackgroundPlayService::class.java))
+                    } else {
+                        // Permission not granted — open system settings
+                        android.widget.Toast.makeText(
+                            context,
+                            "Please grant 'Draw over other apps', then tap the toggle again",
+                            android.widget.Toast.LENGTH_LONG
+                        ).show()
+                        val intent = android.content.Intent(
+                            android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            android.net.Uri.parse("package:${context.packageName}")
+                        )
+                        context.startActivity(intent)
+                    }
+                } else {
+                    viewModel.setFloatingWindow(false)
+                    context.stopService(
+                        android.content.Intent(context, com.tutu.browser.service.FloatingWindowService::class.java)
+                    )
+                }
+            },
             title = "Floating Window",
             icon = Icons.Default.PictureInPictureAlt
         )

@@ -66,13 +66,6 @@ fun SettingsScreen(
     var showClearDataDialog by remember { mutableStateOf(false) }
     var showOverlayPermissionDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
-    var hasOverlayPermission by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
-    
-    // Check permission when returning from system settings
-    DisposableEffect(Unit) {
-        hasOverlayPermission = Settings.canDrawOverlays(context)
-        onDispose { }
-    }
     
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -150,11 +143,15 @@ fun SettingsScreen(
             ToggleSwitch(
                 checked = settings.floatingWindow,
                 onCheckedChange = { enabled ->
+                    android.util.Log.d("SettingsScreen", "Floating Window toggle: $enabled")
                     if (enabled) {
-                        // Check for overlay permission before enabling
-                        if (hasOverlayPermission) {
+                        // Check for overlay permission in real-time
+                        val hasPermission = Settings.canDrawOverlays(context)
+                        android.util.Log.d("SettingsScreen", "Has overlay permission: $hasPermission")
+                        if (hasPermission) {
                             viewModel.setFloatingWindow(true)
                         } else {
+                            android.util.Log.d("SettingsScreen", "Showing permission dialog")
                             showOverlayPermissionDialog = true
                         }
                     } else {
@@ -164,7 +161,7 @@ fun SettingsScreen(
                 title = "Floating Window",
                 subtitle = when {
                     settings.backgroundPlayback -> "Disabled (Background Playback is on)"
-                    !hasOverlayPermission -> "Requires 'Draw over apps' permission"
+                    !Settings.canDrawOverlays(context) -> "Requires 'Draw over apps' permission"
                     else -> "Video plays in a floating window"
                 },
                 icon = Icons.Default.PictureInPicture,
