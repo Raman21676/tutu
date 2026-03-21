@@ -116,7 +116,9 @@ class MainActivity : ComponentActivity() {
                             currentTitle = title
                         },
                         onScreenChanged = { screen ->
-                            isInWebScreen = (screen == Screen.Web.route.substringBefore("/"))
+                            val webRoutePrefix = Screen.Web.route.substringBefore("/")
+                            isInWebScreen = screen.startsWith(webRoutePrefix)
+                            Log.d(TAG, "Screen changed: $screen, isInWebScreen: $isInWebScreen")
                         }
                     )
                 }
