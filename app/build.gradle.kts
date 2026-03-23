@@ -20,6 +20,15 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("../tutu-browser.keystore")
+            storePassword = "tutu12345"
+            keyAlias = "tutu"
+            keyPassword = "tutu12345"
+        }
+    }
+    
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -28,7 +37,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
         debug {
             isMinifyEnabled = false

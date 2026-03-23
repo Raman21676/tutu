@@ -1,8 +1,10 @@
 package com.tutu.browser.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,13 +25,14 @@ import androidx.compose.material.icons.filled.ScreenRotation
 import androidx.compose.material.icons.filled.SettingsBrightness
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.PictureInPictureAlt
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -41,8 +44,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.tutu.browser.R
@@ -89,22 +95,30 @@ fun HomeScreen(
     }
     
     val context = LocalContext.current
+    val isFirstLaunch by viewModel.isFirstLaunch.collectAsState()
+    
+    // Mark first launch as complete when the screen is shown
+    LaunchedEffect(Unit) {
+        if (isFirstLaunch) {
+            viewModel.onFirstLaunchComplete()
+        }
+    }
     
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp, vertical = 32.dp),
+            .padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // Logo
         AppIcon(
-            modifier = Modifier.padding(top = 24.dp, bottom = 8.dp),
+            modifier = Modifier.padding(top = 4.dp, bottom = 0.dp),
             size = 120
         )
         
         Text(
-            text = "tutu",
+            text = "TuTu",
             style = MaterialTheme.typography.headlineLarge.copy(
                 fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
             ),
@@ -112,12 +126,12 @@ fun HomeScreen(
         )
         
         Text(
-            text = "lightweight browser",
+            text = "Fast & Private",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         
-        Spacer(modifier = Modifier.height(48.dp))
+        Spacer(modifier = Modifier.height(16.dp))
         
         // URL Input
         UrlInputField(
@@ -172,12 +186,6 @@ fun HomeScreen(
                 icon = Icons.Default.DarkMode
             )
         }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        HorizontalDivider()
-        
-        Spacer(modifier = Modifier.height(16.dp))
         
         // Background Playback Toggle
         ToggleSwitch(
@@ -302,6 +310,7 @@ fun HomeScreen(
     }
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun RestoreSessionDialog(
     url: String,
@@ -309,31 +318,85 @@ private fun RestoreSessionDialog(
     onDismiss: (Boolean) -> Unit
 ) {
     var rememberChoice by remember { mutableStateOf(false) }
-    val domain = url.removePrefix("https://").removePrefix("http://").take(30)
     
-    AlertDialog(
+    androidx.compose.material3.BasicAlertDialog(
         onDismissRequest = { onDismiss(rememberChoice) },
-        title = { Text(stringResource(R.string.dialog_restore_title)) },
-        text = {
-            Column {
-                Text(stringResource(R.string.dialog_restore_message, domain))
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { onConfirm(rememberChoice) },
-                colors = ButtonDefaults.buttonColors(containerColor = CoralRed)
+        modifier = Modifier.padding(24.dp)
+    ) {
+        androidx.compose.material3.Surface(
+            shape = androidx.compose.material3.MaterialTheme.shapes.large,
+            color = androidx.compose.material3.MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(stringResource(R.string.dialog_yes))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = { onDismiss(rememberChoice) }) {
-                Text(stringResource(R.string.dialog_no))
+                // Title
+                Text(
+                    text = "Restore Website",
+                    style = androidx.compose.material3.MaterialTheme.typography.titleLarge,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Message
+                Text(
+                    text = "Open last visited website?",
+                    style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                // Buttons Row
+                androidx.compose.foundation.layout.Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Cancel Button (outlined)
+                    OutlinedButton(
+                        onClick = { onDismiss(rememberChoice) },
+                        modifier = Modifier.weight(1f),
+                        shape = androidx.compose.material3.MaterialTheme.shapes.medium,
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = CoralRed
+                        ),
+                        border = androidx.compose.foundation.BorderStroke(
+                            width = 2.dp,
+                            color = CoralRed
+                        )
+                    ) {
+                        Text(
+                            "Cancel",
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
+                        )
+                    }
+                    
+                    // OK Button (filled)
+                    Button(
+                        onClick = { onConfirm(rememberChoice) },
+                        modifier = Modifier.weight(1f),
+                        shape = androidx.compose.material3.MaterialTheme.shapes.medium,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = CoralRed,
+                            contentColor = androidx.compose.ui.graphics.Color.White
+                        )
+                    ) {
+                        Text(
+                            "OK",
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
+                        )
+                    }
+                }
             }
         }
-    )
+    }
 }
 
 @Preview

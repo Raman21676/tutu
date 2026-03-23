@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policies - 1Click Apps</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            padding: 40px 20px;
+            color: white;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .main-card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            margin-bottom: 30px;
+        }
+        
+        .intro {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 30px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        
+        .intro h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+        
+        .intro p {
+            color: #666;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .privacy-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-weight: 600;
+            margin-top: 20px;
+        }
+        
+        .apps-section h2 {
+            color: #333;
+            margin-bottom: 25px;
+            font-size: 1.5em;
+        }
+        
+        .app-list {
+            display: grid;
+            gap: 15px;
+        }
+        
+        .app-card {
+            display: flex;
+            align-items: center;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            color: inherit;
+        }
+        
+        .app-card:hover {
+            border-color: #667eea;
+            transform: translateX(5px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.2);
+        }
+        
+        .app-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            margin-right: 20px;
+            flex-shrink: 0;
+        }
+        
+        .app-info {
+            flex: 1;
+        }
+        
+        .app-info h3 {
+            color: #333;
+            margin-bottom: 5px;
+            font-size: 1.2em;
+        }
+        
+        .app-info p {
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .app-arrow {
+            font-size: 24px;
+            color: #667eea;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .app-card:hover .app-arrow {
+            opacity: 1;
+        }
+        
+        .contact-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+            margin-top: 30px;
+        }
+        
+        .contact-section h2 {
+            margin-bottom: 15px;
+        }
+        
+        .contact-section a {
+            color: #ffd700;
+            text-decoration: none;
+        }
+        
+        .contact-section a:hover {
+            text-decoration: underline;
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 30px;
+            color: rgba(255,255,255,0.8);
+        }
+        
+        .footer a {
+            color: white;
+            text-decoration: none;
+        }
+        
+        @media (max-width: 600px) {
+            .header h1 {
+                font-size: 1.8em;
+            }
+            
+            .main-card {
+                padding: 25px;
+            }
+            
+            .app-card {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .app-icon {
+                margin-right: 0;
+                margin-bottom: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔒 Privacy Policy Hub</h1>
+            <p>Transparency and trust for all our applications</p>
+        </div>
+        
+        <div class="main-card">
+            <div class="intro">
+                <h2>Your Privacy Matters</h2>
+                <p>
+                    We believe privacy is a fundamental right. All our apps are designed with privacy-first principles. 
+                    Select an app below to view its specific privacy policy.
+                </p>
+                <div class="privacy-badge">
+                    <span>✓</span>
+                    <span>No Data Collection Policy</span>
+                </div>
+            </div>
+            
+            <div class="apps-section">
+                <h2>📱 Our Applications</h2>
+                <div class="app-list">
+                    <a href="tutu-browser/" class="app-card">
+                        <div class="app-icon">🌐</div>
+                        <div class="app-info">
+                            <h3>TuTu Browser</h3>
+                            <p>Fast & Lightweight Web Browser - Your data stays on your device</p>
+                        </div>
+                        <div class="app-arrow">→</div>
+                    </a>
+                    
+                    <!-- Add more apps here as you publish them -->
+                    <!--
+                    <a href="app2/" class="app-card">
+                        <div class="app-icon">📱</div>
+                        <div class="app-info">
+                            <h3>App Name 2</h3>
+                            <p>App description here</p>
+                        </div>
+                        <div class="app-arrow">→</div>
+                    </a>
+                    -->
+                </div>
+            </div>
+            
+            <div class="contact-section">
+                <h2>📧 Questions or Concerns?</h2>
+                <p>If you have any questions about our privacy practices, please contact us at:</p>
+                <p style="margin-top: 10px;">
+                    <strong>Email:</strong> <a href="mailto:your-email@example.com">your-email@example.com</a>
+                </p>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>© 2026 1Click Apps. All rights reserved.</p>
+            <p style="margin-top: 10px;">
+                <a href="https://1click.live">← Back to Main Website</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

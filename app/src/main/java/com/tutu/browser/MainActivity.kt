@@ -133,6 +133,10 @@ class MainActivity : ComponentActivity() {
     
     override fun onPause() {
         super.onPause()
+        
+        // Stop timestamp tracking when leaving app
+        WebViewHolder.stopTimestampTracking()
+        
         if (WebViewHolder.backgroundPlayEnabled) {
             // postDelayed is REQUIRED. Android's internal WebViewChromium.pauseTimers()
             // is dispatched ~10-30ms AFTER super.onPause() returns.
@@ -145,10 +149,11 @@ class MainActivity : ComponentActivity() {
             }, 50)
             startBackgroundPlayService(currentUrl, currentTitle)
         } else if (WebViewHolder.floatingWindowEnabled && isInWebScreen) {
-            // Start floating window when app is minimized
+            // Use the periodically-saved timestamp
             val holderUrl = WebViewHolder.currentUrl
             val url = if (holderUrl.isNotBlank()) holderUrl else currentUrl
-            Log.d(TAG, "onPause: Starting floating window service - url: $url")
+            val timestamp = WebViewHolder.currentTimestamp
+            Log.d(TAG, "onPause: Starting floating window with timestamp=$timestamp, url=$url")
             startFloatingWindowService(url, currentTitle)
         } else {
             Log.d(TAG, "onPause: Not starting floating window. floatingEnabled: ${WebViewHolder.floatingWindowEnabled}, isInWebScreen: $isInWebScreen")
@@ -157,10 +162,22 @@ class MainActivity : ComponentActivity() {
     
     override fun onResume() {
         super.onResume()
-        Log.d(TAG, "onResume")
+        Log.d(TAG, "onResume - timestamp to restore: ${WebViewHolder.currentTimestamp}")
         
         // Stop background services when app comes to foreground
         stopBackgroundServices()
+        
+        // Restore video timestamp if we have one (from floating window return)
+        if (WebViewHolder.currentTimestamp > 0) {
+            val timestamp = WebViewHolder.currentTimestamp
+            WebViewHolder.webView?.evaluateJavascript(
+                "(function() { var v = document.querySelector('video'); if (v) { v.currentTime = $timestamp; return 'set to $timestamp'; } return 'no video'; })();"
+            ) { result ->
+                Log.d(TAG, "onResume: Restored timestamp result: $result")
+            }
+            // Clear timestamp after restoring
+            WebViewHolder.currentTimestamp = 0f
+        }
     }
     
     override fun onDestroy() {
@@ -184,9 +201,10 @@ class MainActivity : ComponentActivity() {
     }
     
     private fun startFloatingWindowService(url: String, title: String) {
-        Log.d(TAG, "Starting FloatingWindowService with url: $url")
+        Log.d(TAG, "Starting FloatingWindowService with url: $url, timestamp: ${WebViewHolder.currentTimestamp}")
         val intent = Intent(this, FloatingWindowService::class.java).apply {
             putExtra(FloatingWindowService.EXTRA_URL, url)
+            putExtra(FloatingWindowService.EXTRA_TIMESTAMP, WebViewHolder.currentTimestamp)
         }
         
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

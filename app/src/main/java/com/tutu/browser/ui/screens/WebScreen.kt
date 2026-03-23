@@ -568,6 +568,12 @@ fun WebScreen(
         }
         Log.d("WebScreen", "WebViewHolder updated - bgPlay: $backgroundPlayEnabled, floating: $floatingWindowEnabled")
         
+        // Start timestamp tracking for floating window feature
+        if (floatingWindowEnabled && webView != null) {
+            com.tutu.browser.util.WebViewHolder.startTimestampTracking(webView)
+            Log.d("WebScreen", "Timestamp tracking started")
+        }
+        
         val serviceIntent = Intent(context, BackgroundPlayService::class.java)
         
         if (backgroundPlayEnabled) {
@@ -612,6 +618,9 @@ fun WebScreen(
         
         onDispose {
             scriptJob?.cancel()
+            // Stop timestamp tracking
+            com.tutu.browser.util.WebViewHolder.stopTimestampTracking()
+            Log.d("WebScreen", "Timestamp tracking stopped")
             if (!backgroundPlayEnabled) {
                 context.stopService(serviceIntent)
             }
