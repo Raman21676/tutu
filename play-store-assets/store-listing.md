@@ -1,89 +1,82 @@
-# TuTu Browser - Play Store Listing
+# TuTu - Play Store Listing
 
 ## App Name (50 characters max)
 ```
-TuTu Browser - Fast & Light
+TuTu - Video & Web Companion
 ```
 
 ## Short Description (80 characters max)
 ```
-Lightweight browser for quick access to your favorite websites. Fast & private!
+Quick access to videos & websites with background play & floating window features!
 ```
 
 ## Full Description (4000 characters max)
 ```
-TuTu Browser is a lightweight, fast, and privacy-focused web browser designed for users who want quick access to their favorite websites without unnecessary bloat.
+TuTu is your lightweight companion for seamless web and video experiences. Designed for users who want quick access to their favorite content with powerful multitasking features.
 
 ✨ KEY FEATURES:
 
-🚀 LIGHTNING FAST
-- Minimal resource usage for smooth performance
-- Quick loading of your favorite websites
-- Optimized for low-end devices
+📺 VIDEO OPTIMIZED
+• Background audio playback - continue listening when app is minimized
+• Floating window mode - watch videos while using other apps
+• Fullscreen video support for immersive experience
+• Optimized for YouTube, TikTok, and video platforms
+
+⚡ FAST & LIGHTWEIGHT
+• Minimal resource usage for smooth performance
+• Quick launch and fast loading
+• Optimized for low-end devices
+• Small app size (~1.7 MB)
 
 🔒 PRIVACY FIRST
-- No tracking or data collection
-- All data stored locally on your device
-- No third-party analytics
-- Incognito-like experience by default
+• No tracking or data collection
+• All data stored locally on your device
+• No third-party analytics
+• No account required
 
-🌐 QUICK ACCESS
-- Pre-loaded bookmarks for popular sites:
-  • YouTube
-  • TikTok
-  • Facebook
-  • Instagram
-  • Google
-  • Twitter
-- One-tap access to your favorite content
+🌐 QUICK WEB ACCESS
+• One-tap access to popular websites
+• Clean, distraction-free interface
+• HTTPS security by default
+• Session restore functionality
 
 🎨 CUSTOMIZABLE
-- Light & Dark theme support
-- Follow system theme or manual toggle
-- Fullscreen browsing mode
-- Auto-rotation settings
-
-📱 VIDEO OPTIMIZED
-- Fullscreen video playback support
-- Works seamlessly with YouTube Shorts
-- TikTok video playback ready
-- Hardware-accelerated rendering
-
-🔐 SECURITY
-- HTTPS by default
-- Secure browsing experience
-- Mixed content protection
+• Light & Dark theme support
+• Follow system theme automatically
+• Fullscreen browsing mode
+• Auto-rotation settings
 
 ⚙️ SMART FEATURES
-- Session restore - pick up where you left off
-- Desktop mode option
-- URL validation and search integration
-- Clean, intuitive interface
+• Background playback for audio content
+• Floating window for multitasking
+• Desktop mode option
+• URL validation and search integration
 
-TuTu Browser is perfect for users who want a simple, no-nonsense browsing experience. Whether you're watching YouTube Shorts, browsing TikTok, or reading news, TuTu Browser delivers fast and reliable performance.
+TuTu is perfect for users who want a simple, efficient way to access web content and videos. Whether you're watching tutorials, listening to music, or browsing your favorite sites, TuTu delivers a smooth experience.
 
-🌟 WHY TUTU BROWSER?
-- No unnecessary permissions
-- No account required
-- No ads
-- Open your favorite sites instantly
-- Minimal battery and data usage
+🌟 WHY TUTU?
+• No unnecessary permissions
+• No account required
+• No ads
+• Minimal battery usage
+• Background audio continues playing
+• Floating window for multitasking
 
-Download TuTu Browser today and experience the web the way it should be - fast, private, and hassle-free!
+Download TuTu today and enjoy seamless web and video access with powerful multitasking features!
 
 ---
 
-Note: TuTu Browser is a WebView-based browser that provides quick access to websites. Third-party websites you visit are subject to their own terms and privacy policies.
+Note: TuTu provides quick access to websites and video content. Third-party websites you visit are subject to their own terms and privacy policies.
 ```
 
 ## Tags (5 tags max)
 ```
-Browser, Web Browser, Lightweight, Privacy, Fast
+Video Player, Web Companion, Background Play, Floating Window, Lightweight
 ```
 
 ## Category
 ```
-Tools > Browsers
+Tools > Video Players & Editors
 ```
 
 ## Content Rating
@@ -91,15 +84,20 @@ Tools > Browsers
 PEGI 3 / ESRB Everyone
 - No violence
 - No offensive content
-- General web browsing tool
+- General utility tool
 ```
 
 ## Contact Information
-- **Developer Name:** [Your Name/Company]
-- **Website:** [Your Website URL]
-- **Email:** [your-email@example.com]
+- **Developer Name:** Raman Subedi
+- **Website:** https://raman21676.github.io/privacy-policies/
+- **Email:** ramansubedi0309@gmail.com
 
 ## App Access Instructions
 ```
 No special access required. Open the app and start browsing immediately.
+```
+
+## Privacy Policy URL
+```
+https://raman21676.github.io/privacy-policies/tutu-browser/
 ```

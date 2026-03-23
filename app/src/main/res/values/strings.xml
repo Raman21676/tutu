@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">TuTu</string>
+    <string name="app_name">TuTu Companion</string>
     
     <!-- Home Screen -->
     <string name="hint_enter_url">Enter website URL</string>
@@ -38,7 +38,7 @@
     <string name="clear_data">Clear browsing data</string>
     <string name="clear_data_summary">Clear cache and cookies</string>
     <string name="version">Version %1$s</string>
-    <string name="about_description">A lightweight browser for your favorite websites</string>
+    <string name="about_description">Your companion for web and video content</string>
     
     <!-- Default bookmarks -->
     <string name="bookmark_youtube">YouTube</string>

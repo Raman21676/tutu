@@ -261,7 +261,7 @@ fun HomeScreen(
             enabled = urlInput.isNotBlank()
         ) {
             Text(
-                text = stringResource(R.string.btn_open_webview),
+                text = "Open",
                 style = MaterialTheme.typography.labelLarge
             )
         }
