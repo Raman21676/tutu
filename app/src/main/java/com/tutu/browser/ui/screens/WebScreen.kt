@@ -434,16 +434,44 @@ fun WebScreen(
                                 // Reset reading mode on navigation
                                 isReadingMode = false
                                 
-                                // CRITICAL: Override navigator.userAgent before page JS runs
-                                // TikTok's client-side JS checks this independently of HTTP header
-                                val cleanUA = view?.settings?.userAgentString ?: ""
-                                view?.evaluateJavascript(
-                                    "Object.defineProperty(navigator, 'userAgent', { get: function(){ return '$cleanUA'; }});",
-                                    null
-                                )
-                                
                                 // Inject early so YouTube's JS loads with overrides already in place
                                 view?.evaluateJavascript(PAGE_VISIBILITY_OVERRIDE_SCRIPT, null)
+                            }
+                            
+                            override fun onPageCommitVisible(view: WebView?, url: String?) {
+                                super.onPageCommitVisible(view, url)
+                                // CRITICAL: Override navigator properties to hide WebView
+                                // TikTok checks multiple properties beyond userAgent
+                                val cleanUA = view?.settings?.userAgentString ?: return
+                                val escapedUA = cleanUA.replace("'", "\\'")
+                                view.evaluateJavascript(
+                                    """
+                                    try {
+                                        // Override userAgent
+                                        Object.defineProperty(navigator, 'userAgent', { 
+                                            get: function(){ return '$escapedUA'; }
+                                        });
+                                        // Override platform (WebView often shows 'Linux armv8l')
+                                        Object.defineProperty(navigator, 'platform', { 
+                                            get: function(){ return 'Linux aarch64'; }
+                                        });
+                                        // Override appVersion
+                                        Object.defineProperty(navigator, 'appVersion', { 
+                                            get: function(){ return '5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36'; }
+                                        });
+                                        // Add window.chrome if missing (WebView doesn't have it)
+                                        if (!window.chrome) {
+                                            window.chrome = { 
+                                                runtime: {}, 
+                                                app: {},
+                                                csi: function(){},
+                                                loadTimes: function(){}
+                                            };
+                                        }
+                                    } catch(e) {}
+                                    """.trimIndent(),
+                                    null
+                                )
                             }
                             
                             override fun onPageFinished(view: WebView, url: String) {
@@ -465,6 +493,11 @@ fun WebScreen(
                                     "document.querySelectorAll('video').forEach(v => { v.muted = false; v.volume = 1.0; });",
                                     null
                                 )
+                                
+                                // TikTok: Hide download/app promotion popups
+                                if (url.contains("tiktok.com")) {
+                                    view.evaluateJavascript(TIKTOK_POPUP_BLOCKER, null)
+                                }
                             }
                             
                             override fun onLoadResource(view: WebView?, url: String?) {
@@ -870,6 +903,33 @@ private val PAGE_VISIBILITY_OVERRIDE_SCRIPT = """
     }
     keepPlaying();
     setInterval(keepPlaying, 2000);
+})();
+""".trimIndent()
+
+// TikTok popup blocker - Hides "Open TikTok/TikTok Lite" promotion modals
+private val TIKTOK_POPUP_BLOCKER = """
+(function() {
+    function killPopup() {
+        // Find buttons with promotion text
+        var buttons = document.querySelectorAll('button, div[role="button"]');
+        buttons.forEach(function(btn) {
+            var text = btn.textContent || '';
+            if (text.includes('Open TikTok') || text.includes('TikTok Lite') || 
+                text.includes('Get the app') || text.includes('full app')) {
+                // Hide the modal
+                var modal = btn.closest('div[class*="modal"]') || 
+                           btn.closest('div[class*="Modal"]') ||
+                           btn.closest('div[role="dialog"]') ||
+                           btn.parentElement?.parentElement?.parentElement?.parentElement;
+                if (modal) {
+                    modal.style.display = 'none';
+                    modal.remove();
+                }
+            }
+        });
+    }
+    killPopup();
+    setInterval(killPopup, 500);
 })();
 """.trimIndent()
 
