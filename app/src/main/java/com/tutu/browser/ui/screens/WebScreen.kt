@@ -460,6 +460,11 @@ fun WebScreen(
                                     "document.querySelectorAll('video').forEach(v => { v.muted = false; v.volume = 1.0; });",
                                     null
                                 )
+                                
+                                // TikTok: Hide "Get the full app experience" popup
+                                if (url.contains("tiktok.com")) {
+                                    view.evaluateJavascript(TIKTOK_POPUP_BLOCKER, null)
+                                }
                             }
                             
                             override fun onLoadResource(view: WebView?, url: String?) {
@@ -477,6 +482,11 @@ fun WebScreen(
                                     Log.d(TAG, "History updated: $url (reload: $isReload)")
                                     viewModel.onUrlChanged(it)
                                     viewModel.updateNavigationState(view.canGoBack(), view.canGoForward())
+                                    
+                                    // TikTok: Re-inject popup blocker on every SPA navigation
+                                    if (it.contains("tiktok.com")) {
+                                        view.evaluateJavascript(TIKTOK_POPUP_BLOCKER, null)
+                                    }
                                 }
                                 // Re-inject Page Visibility override on every SPA navigation
                                 // This ensures YouTube can't detect background state after navigation
@@ -863,6 +873,51 @@ private val PAGE_VISIBILITY_OVERRIDE_SCRIPT = """
     }
     keepPlaying();
     setInterval(keepPlaying, 2000);
+})();
+""".trimIndent()
+
+// TikTok popup blocker - Hides "Get the full app experience" modal
+private val TIKTOK_POPUP_BLOCKER = """
+(function() {
+    // Aggressively hide the download app popup
+    function killPopup() {
+        // Find and remove the modal by its characteristic elements
+        var buttons = document.querySelectorAll('button, div[role="button"]');
+        buttons.forEach(function(btn) {
+            var text = btn.textContent || '';
+            if (text.includes('Open TikTok') || text.includes('Get the full app')) {
+                // Found the popup - hide the entire parent modal
+                var modal = btn.closest('div[class*="modal"]') || 
+                           btn.closest('div[class*="Modal"]') ||
+                           btn.closest('div[role="dialog"]') ||
+                           btn.parentElement?.parentElement?.parentElement;
+                if (modal) {
+                    modal.style.display = 'none';
+                    modal.remove();
+                }
+            }
+        });
+        
+        // Also hide by common modal patterns
+        document.querySelectorAll('div[role="dialog"], div[role="alertdialog"]').forEach(function(d) {
+            d.style.display = 'none';
+            d.remove();
+        });
+    }
+    
+    // Run immediately and repeatedly
+    killPopup();
+    setInterval(killPopup, 500);
+    
+    // Also watch for DOM changes
+    if (!window.__tutuPopupKiller) {
+        window.__tutuPopupKiller = true;
+        var observer = new MutationObserver(killPopup);
+        observer.observe(document.body || document.documentElement, { 
+            childList: true, 
+            subtree: true 
+        });
+    }
 })();
 """.trimIndent()
 
