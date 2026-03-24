@@ -343,10 +343,13 @@ fun WebScreen(
                             // Performance optimizations for TikTok
                             setRenderPriority(WebSettings.RenderPriority.HIGH)
                             
-                            // CRITICAL FIX: Strip WebView marker from User Agent
-                            // TikTok detects WebView by "; wv" in UA and shows download popup after 2 reels
+                            // CRITICAL FIX: Strip WebView markers from User Agent
+                            // TikTok detects WebView by "; wv" and "Version/4.0" in UA
                             val defaultUA = userAgentString ?: ""
-                            userAgentString = defaultUA.replace("; wv", "")
+                            val cleanUA = defaultUA
+                                .replace("; wv", "")
+                                .replace("Version/4.0 ", "")
+                            userAgentString = cleanUA
                         }
                         
                         // Enable third-party cookies (critical for TikTok, Facebook)
@@ -427,16 +430,18 @@ fun WebScreen(
                                 Log.d(TAG, "Page started: $url")
                                 url?.let { 
                                     viewModel.onPageStarted(it)
-                                    
-                                    // For TikTok: switch to iPad UA to bypass guest limits
-                                    if (it.contains("tiktok.com")) {
-                                        view?.settings?.userAgentString = "Mozilla/5.0 (iPad; CPU OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1"
-                                    } else {
-                                        view?.settings?.userAgentString = "Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.144 Mobile Safari/537.36"
-                                    }
                                 }
                                 // Reset reading mode on navigation
                                 isReadingMode = false
+                                
+                                // CRITICAL: Override navigator.userAgent before page JS runs
+                                // TikTok's client-side JS checks this independently of HTTP header
+                                val cleanUA = view?.settings?.userAgentString ?: ""
+                                view?.evaluateJavascript(
+                                    "Object.defineProperty(navigator, 'userAgent', { get: function(){ return '$cleanUA'; }});",
+                                    null
+                                )
+                                
                                 // Inject early so YouTube's JS loads with overrides already in place
                                 view?.evaluateJavascript(PAGE_VISIBILITY_OVERRIDE_SCRIPT, null)
                             }
@@ -460,11 +465,6 @@ fun WebScreen(
                                     "document.querySelectorAll('video').forEach(v => { v.muted = false; v.volume = 1.0; });",
                                     null
                                 )
-                                
-                                // TikTok: Hide "Get the full app experience" popup
-                                if (url.contains("tiktok.com")) {
-                                    view.evaluateJavascript(TIKTOK_POPUP_BLOCKER, null)
-                                }
                             }
                             
                             override fun onLoadResource(view: WebView?, url: String?) {
@@ -483,10 +483,7 @@ fun WebScreen(
                                     viewModel.onUrlChanged(it)
                                     viewModel.updateNavigationState(view.canGoBack(), view.canGoForward())
                                     
-                                    // TikTok: Re-inject popup blocker on every SPA navigation
-                                    if (it.contains("tiktok.com")) {
-                                        view.evaluateJavascript(TIKTOK_POPUP_BLOCKER, null)
-                                    }
+
                                 }
                                 // Re-inject Page Visibility override on every SPA navigation
                                 // This ensures YouTube can't detect background state after navigation
@@ -873,51 +870,6 @@ private val PAGE_VISIBILITY_OVERRIDE_SCRIPT = """
     }
     keepPlaying();
     setInterval(keepPlaying, 2000);
-})();
-""".trimIndent()
-
-// TikTok popup blocker - Hides "Get the full app experience" modal
-private val TIKTOK_POPUP_BLOCKER = """
-(function() {
-    // Aggressively hide the download app popup
-    function killPopup() {
-        // Find and remove the modal by its characteristic elements
-        var buttons = document.querySelectorAll('button, div[role="button"]');
-        buttons.forEach(function(btn) {
-            var text = btn.textContent || '';
-            if (text.includes('Open TikTok') || text.includes('Get the full app')) {
-                // Found the popup - hide the entire parent modal
-                var modal = btn.closest('div[class*="modal"]') || 
-                           btn.closest('div[class*="Modal"]') ||
-                           btn.closest('div[role="dialog"]') ||
-                           btn.parentElement?.parentElement?.parentElement;
-                if (modal) {
-                    modal.style.display = 'none';
-                    modal.remove();
-                }
-            }
-        });
-        
-        // Also hide by common modal patterns
-        document.querySelectorAll('div[role="dialog"], div[role="alertdialog"]').forEach(function(d) {
-            d.style.display = 'none';
-            d.remove();
-        });
-    }
-    
-    // Run immediately and repeatedly
-    killPopup();
-    setInterval(killPopup, 500);
-    
-    // Also watch for DOM changes
-    if (!window.__tutuPopupKiller) {
-        window.__tutuPopupKiller = true;
-        var observer = new MutationObserver(killPopup);
-        observer.observe(document.body || document.documentElement, { 
-            childList: true, 
-            subtree: true 
-        });
-    }
 })();
 """.trimIndent()
 
