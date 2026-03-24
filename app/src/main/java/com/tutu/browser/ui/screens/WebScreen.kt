@@ -35,8 +35,11 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PictureInPicture
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -70,6 +73,8 @@ import com.tutu.browser.ui.components.IndeterminateProgressIndicator
 import com.tutu.browser.ui.components.LinearProgressIndicatorCustom
 import com.tutu.browser.ui.theme.CoralRed
 import com.tutu.browser.ui.viewmodel.WebViewModel
+import com.tutu.browser.util.DarkModeInjector
+import com.tutu.browser.util.ReadingModeInjector
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,6 +96,15 @@ fun WebScreen(
     // Fullscreen video handling
     var customView by remember { mutableStateOf<View?>(null) }
     var customViewCallback by remember { mutableStateOf<WebChromeClient.CustomViewCallback?>(null) }
+    
+    // Feature states
+    var isReadingMode by remember { mutableStateOf(false) }
+    var showQrDialog by remember { mutableStateOf(false) }
+    
+    // QR Scanner launcher
+    val qrScanLauncher = rememberQrScanLauncher { scannedUrl ->
+        webView?.loadUrl(scannedUrl)
+    }
     
     val context = androidx.compose.ui.platform.LocalContext.current
     val activity = context as Activity
@@ -214,6 +228,17 @@ fun WebScreen(
                             }
                         },
                         actions = {
+                            // Reading Mode toggle
+                            IconButton(onClick = {
+                                webView?.let { isReadingMode = ReadingModeInjector.toggle(it, isReadingMode) }
+                            }) {
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = "Reading Mode",
+                                    tint = if (isReadingMode) CoralRed else MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                            
                             // PiP button (show if enabled - works on Android 8.0+)
                             if (pipEnabled) {
                                 IconButton(onClick = { enterPipMode() }) {
@@ -253,7 +278,9 @@ fun WebScreen(
                     onBack = { webView?.goBack() },
                     onForward = { webView?.goForward() },
                     onRefresh = { webView?.reload() },
-                    onHome = onNavigateHome
+                    onHome = onNavigateHome,
+                    onScanQr = { qrScanLauncher.launch() },
+                    onShowQr = { showQrDialog = true }
                 )
             }
         }
@@ -406,6 +433,8 @@ fun WebScreen(
                                         view?.settings?.userAgentString = "Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.144 Mobile Safari/537.36"
                                     }
                                 }
+                                // Reset reading mode on navigation
+                                isReadingMode = false
                                 // Inject early so YouTube's JS loads with overrides already in place
                                 view?.evaluateJavascript(PAGE_VISIBILITY_OVERRIDE_SCRIPT, null)
                             }
@@ -451,6 +480,12 @@ fun WebScreen(
                                     Log.d(TAG, "History updated: $url (reload: $isReload)")
                                     viewModel.onUrlChanged(it)
                                     viewModel.updateNavigationState(view.canGoBack(), view.canGoForward())
+                                    
+                                    // Re-inject TikTok unblock script on every navigation
+                                    if (it.contains("tiktok.com")) {
+                                        Log.d(TAG, "Re-injecting TikTok unblock script on navigation")
+                                        view.evaluateJavascript(TIKTOK_UNBLOCK_SCRIPT, null)
+                                    }
                                 }
                                 // Re-inject Page Visibility override on every SPA navigation
                                 // This ensures YouTube can't detect background state after navigation
@@ -630,6 +665,14 @@ fun WebScreen(
             }
         }
     }
+    
+    // QR Share Dialog
+    if (showQrDialog) {
+        QrShareDialog(
+            currentUrl = state.url,
+            onDismiss = { showQrDialog = false }
+        )
+    }
 }
 
 @Composable
@@ -639,13 +682,15 @@ private fun BottomNavigationBar(
     onBack: () -> Unit,
     onForward: () -> Unit,
     onRefresh: () -> Unit,
-    onHome: () -> Unit
+    onHome: () -> Unit,
+    onScanQr: () -> Unit,
+    onShowQr: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 8.dp, vertical = 8.dp),
+            .padding(horizontal = 4.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconButton(
@@ -679,6 +724,28 @@ private fun BottomNavigationBar(
             Icon(
                 imageVector = Icons.Default.Refresh,
                 contentDescription = "Refresh"
+            )
+        }
+        
+        // QR Scanner button
+        IconButton(
+            onClick = onScanQr,
+            modifier = Modifier.weight(1f)
+        ) {
+            Icon(
+                imageVector = Icons.Default.PlayArrow,
+                contentDescription = "Scan QR Code"
+            )
+        }
+        
+        // QR Share button
+        IconButton(
+            onClick = onShowQr,
+            modifier = Modifier.weight(1f)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Share,
+                contentDescription = "Share as QR"
             )
         }
         
@@ -808,25 +875,28 @@ private val PAGE_VISIBILITY_OVERRIDE_SCRIPT = """
 })();
 """.trimIndent()
 
-// TikTok unblock script (kept for reference)
+// TikTok unblock script - Blocks download prompts and enables infinite scroll
 private val TIKTOK_UNBLOCK_SCRIPT = """
 (function() {
     if (window.__tutuTikTokFixed) return;
     window.__tutuTikTokFixed = true;
     
+    // CSS to hide all blocking elements
     var style = document.createElement('style');
     style.id = 'tutu-tiktok-fix';
     style.textContent = '
+        /* Hide navigation bars */
         nav, [class*="SideNavBar"], [class*="side-nav"],
         [class*="sideNav"], [class*="sidebar"],
-        [data-e2e="nav-sidebar"],
-        aside {
+        [data-e2e="nav-sidebar"], aside {
             display: none !important;
             width: 0 !important;
             min-width: 0 !important;
             max-width: 0 !important;
             overflow: hidden !important;
         }
+        
+        /* Full width layout */
         html, body, #app, #app > div, main,
         [class*="DivBodyContainer"],
         [class*="DivContentContainer"],
@@ -838,6 +908,8 @@ private val TIKTOK_UNBLOCK_SCRIPT = """
             overflow-y: auto !important;
             -webkit-overflow-scrolling: touch !important;
         }
+        
+        /* Video containers */
         [class*="DivItemContainer"],
         [class*="video-card"],
         [class*="VideoCard"] {
@@ -845,72 +917,138 @@ private val TIKTOK_UNBLOCK_SCRIPT = """
             height: 100vh !important;
             max-width: 100vw !important;
         }
+        
         video {
             width: 100vw !important;
             height: 100vh !important;
             object-fit: cover !important;
         }
-        [class*="DivContentContainer"] > div,
-        [class*="main-content"] > div {
-            margin-left: 0 !important;
-            padding-left: 0 !important;
-        }
+        
+        /* Hide ALL download/app prompts */
         [class*="DraftPanel"], [class*="draft-panel"],
         [class*="DownloadGuide"], [class*="download-guide"],
         [class*="BottomDrawer"], [class*="bottom-drawer"],
         [class*="login-modal"], [class*="LoginModal"],
         div[class*="modal"][class*="download"],
-        div[class*="open-in-app"],
-        div[class*="install-app"],
-        div[class*="guide-modal"],
-        div[class*="download-bar"],
-        div[class*="verify-bar"],
-        div[class*="login-banner"],
-        div[class*="bottom-banner"],
-        div[class*="overlay-mask"],
-        div[class*="mask-enter"],
-        div[class*="popup"],
-        div[class*="Modal"],
-        div[class*="modal"],
+        div[class*="open-in-app"], div[class*="install-app"],
+        div[class*="guide-modal"], div[class*="download-bar"],
+        div[class*="verify-bar"], div[class*="login-banner"],
+        div[class*="bottom-banner"], div[class*="overlay-mask"],
+        div[class*="mask-enter"], div[class*="popup"],
+        div[class*="Modal"], div[class*="modal"],
         .download-guide, .open-in-app-banner, .guide-modal,
-        [class*="Banner"], [class*="banner"] {
+        [class*="Banner"], [class*="banner"],
+        
+        /* NEW: Hide "Get the full app" modal */
+        div[role="dialog"], div[role="alertdialog"],
+        [class*="get-app"], [class*="GetApp"],
+        [class*="app-download"], [class*="AppDownload"],
+        [class*="experience-modal"], [class*="full-app"],
+        [data-e2e="get-app-modal"], [data-e2e="download-app"],
+        button[class*="open-app"], a[class*="open-app"] {
             display: none !important;
             opacity: 0 !important;
             visibility: hidden !important;
             pointer-events: none !important;
+            z-index: -9999 !important;
+        }
+        
+        /* Hide "Open app" button at top */
+        [data-e2e="open-app-button"], [class*="open-app-btn"],
+        [class*="OpenAppButton"], #open-app, .open-app {
+            display: none !important;
         }
     ';
     document.head.appendChild(style);
     
+    // Aggressive function to hide ALL obstructions
     function hideObstructions() {
         var selectors = [
             '[class*="DraftPanel"]', '[class*="DownloadGuide"]',
             '[class*="BottomDrawer"]', '[class*="login-modal"]',
             '.download-guide', '.open-in-app-banner',
             '.guide-modal', '[class*="Banner"]',
-            'div[class*="modal"]', 'div[class*="Modal"]'
+            'div[class*="modal"]', 'div[class*="Modal"]',
+            'div[role="dialog"]', 'div[role="alertdialog"]',
+            '[class*="get-app"]', '[class*="GetApp"]',
+            '[class*="app-download"]', '[class*="experience"]',
+            'button[class*="open-tiktok"]',
+            '[data-e2e="open-app-button"]'
         ];
+        
         selectors.forEach(function(selector) {
             document.querySelectorAll(selector).forEach(function(el) {
                 el.style.display = 'none';
+                el.style.visibility = 'hidden';
+                el.style.opacity = '0';
                 el.remove();
             });
         });
+        
+        // Remove blur/overlay effects
+        document.querySelectorAll('body > div').forEach(function(div) {
+            if (div.style.position === 'fixed' || 
+                getComputedStyle(div).position === 'fixed') {
+                var rect = div.getBoundingClientRect();
+                // If it's a full-screen overlay, likely a modal
+                if (rect.width > window.innerWidth * 0.8 && 
+                    rect.height > window.innerHeight * 0.5) {
+                    div.style.display = 'none';
+                    div.remove();
+                }
+            }
+        });
     }
     
-    setInterval(hideObstructions, 1000);
+    // Run frequently
+    setInterval(hideObstructions, 500);
     hideObstructions();
     
     document.addEventListener('DOMContentLoaded', hideObstructions);
     window.addEventListener('load', hideObstructions);
     
-    var observer = new MutationObserver(hideObstructions);
-    observer.observe(document.body, { childList: true, subtree: true });
+    // Watch for new elements
+    var observer = new MutationObserver(function(mutations) {
+        hideObstructions();
+        mutations.forEach(function(mutation) {
+            mutation.addedNodes.forEach(function(node) {
+                if (node.nodeType === 1) { // Element node
+                    // Check if it's a modal/dialog
+                    var text = node.textContent || '';
+                    if (text.includes('full app') || 
+                        text.includes('Open TikTok') ||
+                        text.includes('Get the app') ||
+                        text.includes('app experience') ||
+                        text.includes('download app') ||
+                        text.includes('use the app')) {
+                        node.style.display = 'none';
+                        node.remove();
+                    }
+                }
+            });
+        });
+    });
     
+    // Start observing when body is available
+    function startObserver() {
+        if (document.body) {
+            observer.observe(document.body, { 
+                childList: true, 
+                subtree: true 
+            });
+        } else {
+            // Retry after a short delay if body isn't ready
+            setTimeout(startObserver, 100);
+        }
+    }
+    startObserver();
+    
+    // Enable smooth scrolling
     document.body.style.overflow = 'auto';
     document.body.style.overscrollBehavior = 'auto';
     document.documentElement.style.overflow = 'auto';
     
+    // Prevent event blocking
     window.addEventListener('touchmove', function(e) {
         e.stopPropagation();
     }, { passive: true });
@@ -918,5 +1056,14 @@ private val TIKTOK_UNBLOCK_SCRIPT = """
     window.addEventListener('scroll', function(e) {
         e.stopPropagation();
     }, { passive: true });
+    
+    // Bypass video limit by overriding scroll behavior
+    var lastScrollTop = 0;
+    window.addEventListener('scroll', function() {
+        var st = window.pageYOffset || document.documentElement.scrollTop;
+        lastScrollTop = st;
+    }, { passive: true });
+    
+    console.log('TuTu TikTok Fix: Infinite scroll enabled');
 })();
 """.trimIndent()
