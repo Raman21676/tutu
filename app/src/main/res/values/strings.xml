@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">TuTu Companion</string>
+    <string name="app_name">NOVA Browser</string>
     
     <!-- Home Screen -->
     <string name="hint_enter_url">Enter website URL</string>

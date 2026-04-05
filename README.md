@@ -1,4 +1,4 @@
-# TuTu Browser - Final Build
+# NOVA Browser - Final Build
 
 A lightweight, privacy-focused Android web browser with theme support and video optimization.
 
@@ -46,7 +46,7 @@ A lightweight, privacy-focused Android web browser with theme support and video 
 
 ### Debug Build
 ```bash
-cd ~/Desktop/TuTu-final
+cd ~/Desktop/NOVA-final
 export JAVA_HOME=/Users/kalikali/Library/Java/JavaVirtualMachines/jdk-21.0.6+7/Contents/Home
 ./gradlew assembleDebug
 ```
@@ -56,7 +56,7 @@ APK: `app/build/outputs/apk/debug/app-debug.apk`
 ### Release Build (for Play Store)
 ```bash
 # Generate signing key (first time only)
-keytool -genkey -v -keystore tutu-browser.keystore -alias tutu -keyalg RSA -keysize 2048 -validity 10000
+keytool -genkey -v -keystore nova-browser.keystore -alias tutu -keyalg RSA -keysize 2048 -validity 10000
 
 # Build release AAB
 ./gradlew bundleRelease
@@ -120,8 +120,8 @@ See `play-store-assets/privacy-policy/privacy-policy.md`
 ## 📝 Version
 
 - **Current:** 1.0.0
-- **Package:** com.tutu.browser
-- **Name:** TuTu Browser
+- **Package:** com.nova.browser
+- **Name:** NOVA Browser
 
 ## 🤝 Support
 
