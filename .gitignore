@@ -33,3 +33,7 @@ captures/
 
 # Google Services (e.g. APIs or Firebase)
 google-services.json
+
+# AI Session Logs (private)
+.ai-sessions/
+*.session-log.md
