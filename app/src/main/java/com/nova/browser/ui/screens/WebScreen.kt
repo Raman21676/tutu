@@ -82,6 +82,7 @@ import com.nova.browser.ui.viewmodel.WebViewModel
 import com.nova.browser.domain.repository.DownloadRepository
 import com.nova.browser.util.DarkModeInjector
 import com.nova.browser.util.ReadingModeInjector
+import com.nova.browser.util.AdBlocker
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -99,6 +100,10 @@ fun WebScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val fullscreen by viewModel.fullscreen.collectAsState()
+    val adBlockEnabled by viewModel.adBlockEnabled.collectAsState()
+    
+    // Get AdBlocker instance
+    val adBlocker = remember { AdBlocker.getInstance() }
     
     // Tab manager for tracking tab state
     val tabManager = remember { TabManager.getInstance() }
@@ -613,8 +618,18 @@ fun WebScreen(
                             }
                             
                             override fun shouldInterceptRequest(view: WebView?, request: android.webkit.WebResourceRequest?): android.webkit.WebResourceResponse? {
-                                // Privacy Browser: No request interception
-                                // We don't modify or block any requests
+                                // Check if ad blocking is enabled
+                                if (adBlockEnabled && request?.url != null) {
+                                    val url = request.url.toString()
+                                    if (adBlocker.shouldBlock(url)) {
+                                        // Return empty response for blocked ads/trackers
+                                        return android.webkit.WebResourceResponse(
+                                            "text/plain",
+                                            "UTF-8",
+                                            java.io.ByteArrayInputStream("".toByteArray())
+                                        )
+                                    }
+                                }
                                 return super.shouldInterceptRequest(view, request)
                             }
                             
@@ -793,65 +808,37 @@ data class PendingDownload(
     val mimeType: String? = null
 )
 
-// Execute the download using DownloadManager and save to app's database
+// Execute the download using custom DownloadService (OkHttp with pause/resume)
+// Downloads are saved to the "Nova Downloads" folder
 private fun executeDownload(
     context: android.content.Context, 
     download: PendingDownload,
     downloadRepository: DownloadRepository? = null
 ) {
-    try {
-        val request = android.app.DownloadManager.Request(Uri.parse(download.url)).apply {
-            download.mimeType?.let { setMimeType(it) }
-            download.cookies?.let { addRequestHeader("Cookie", it) }
-            download.userAgent?.let { addRequestHeader("User-Agent", it) }
-            setTitle(download.fileName)
-            setDescription("Downloading ${download.fileName}...")
-            setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            
-            // Use public Downloads directory for Android 9 and below
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-                setDestinationInExternalPublicDir(
-                    android.os.Environment.DIRECTORY_DOWNLOADS,
-                    download.fileName
+    downloadRepository?.let { repo ->
+        kotlinx.coroutines.GlobalScope.launch {
+            try {
+                val downloadId = repo.startDownload(
+                    url = download.url,
+                    fileName = download.fileName,
+                    mimeType = download.mimeType ?: "application/octet-stream",
+                    cookies = download.cookies,
+                    userAgent = download.userAgent
                 )
-            } else {
-                // Android 10+ - use app-specific directory to avoid permission issues
-                setDestinationInExternalFilesDir(
-                    context,
-                    android.os.Environment.DIRECTORY_DOWNLOADS,
-                    download.fileName
-                )
-            }
-        }
-        val dm = context.getSystemService(android.content.Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
-        val downloadId = dm.enqueue(request)
-        
-        // Save to app's database for tracking in Downloads screen
-        downloadRepository?.let { repo ->
-            kotlinx.coroutines.GlobalScope.launch {
-                try {
-                    val downloadEntity = com.nova.browser.data.local.db.DownloadEntity(
-                        id = downloadId,
-                        url = download.url,
-                        fileName = download.fileName,
-                        mimeType = download.mimeType ?: "application/octet-stream",
-                        filePath = "",
-                        totalBytes = 0,
-                        status = com.nova.browser.data.local.db.DownloadEntity.STATUS_RUNNING
-                    )
-                    repo.insertDownload(downloadEntity)
-                    repo.startTracking(downloadId)
-                    Log.d("WebScreen", "=== Download saved to database: ${download.fileName}")
-                } catch (e: Exception) {
-                    Log.e("WebScreen", "=== Failed to save download to database: ${e.message}")
+                Log.d("WebScreen", "=== Download started via DownloadService: ${download.fileName} (id=$downloadId)")
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    Toast.makeText(context, "Downloading ${download.fileName}...", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Log.e("WebScreen", "=== Download failed: ${e.message}")
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    Toast.makeText(context, "Download failed: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
-        } ?: Log.w("WebScreen", "=== downloadRepository is null, download not tracked")
-        
-        Toast.makeText(context, "Downloading ${download.fileName}...", Toast.LENGTH_SHORT).show()
-    } catch (e: Exception) {
-        Toast.makeText(context, "Download failed: ${e.message}", Toast.LENGTH_LONG).show()
-        Log.e("WebScreen", "Download failed: ${e.message}", e)
+        }
+    } ?: run {
+        Log.w("WebScreen", "=== downloadRepository is null, cannot start download")
+        Toast.makeText(context, "Download not available", Toast.LENGTH_SHORT).show()
     }
 }
 

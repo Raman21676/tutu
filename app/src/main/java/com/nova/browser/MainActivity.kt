@@ -33,6 +33,7 @@ import com.nova.browser.ui.screens.BookmarksScreen
 import com.nova.browser.ui.screens.DownloadsScreen
 import com.nova.browser.ui.screens.HistoryScreen
 import com.nova.browser.ui.screens.HomeScreen
+import com.nova.browser.ui.screens.IncognitoWebScreen
 import com.nova.browser.ui.screens.SettingsScreen
 import com.nova.browser.ui.screens.TabsScreen
 import com.nova.browser.ui.screens.WebScreen
@@ -185,6 +186,10 @@ private fun TutuNavigation(
                 },
                 onNavigateToTabs = {
                     navController.navigate(Screen.Tabs.route)
+                },
+                onNavigateToIncognito = { url ->
+                    val encodedUrl = URLEncoder.encode(url, StandardCharsets.UTF_8.toString())
+                    navController.navigate(Screen.Incognito.createRoute(encodedUrl))
                 }
             )
         }
@@ -292,6 +297,32 @@ private fun TutuNavigation(
                 onNavigateBack = { navController.popBackStack() }
             )
         }
+        
+        composable(
+            route = Screen.Incognito.route,
+            arguments = listOf(
+                navArgument("url") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val url = backStackEntry.arguments?.getString("url") ?: "https://www.google.com"
+            val decodedUrl = java.net.URLDecoder.decode(url, StandardCharsets.UTF_8.toString())
+
+            val viewModel: WebViewModel = viewModel(
+                factory = WebViewModel.Factory(
+                    settingsRepository = settingsRepository,
+                    initialUrl = decodedUrl
+                )
+            )
+
+            IncognitoWebScreen(
+                viewModel = viewModel,
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateHome = {
+                    navController.popBackStack(Screen.Home.route, inclusive = false)
+                },
+                downloadRepository = downloadRepository
+            )
+        }
     }
 }
 
@@ -306,4 +337,7 @@ sealed class Screen(val route: String) {
     data object History : Screen("history")
     data object Downloads : Screen("downloads")
     data object Settings : Screen("settings")
+    data object Incognito : Screen("incognito/{url}") {
+        fun createRoute(url: String) = "incognito/$url"
+    }
 }

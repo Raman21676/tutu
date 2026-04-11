@@ -41,6 +41,8 @@ class SettingsDataStore(private val context: Context) {
         val REMEMBER_CHOICE = booleanPreferencesKey("remember_choice")
         val BOOKMARKS = stringPreferencesKey("bookmarks")
         val FIRST_LAUNCH = booleanPreferencesKey("first_launch")
+        val SEARCH_ENGINE = stringPreferencesKey("search_engine")
+        val AD_BLOCK_ENABLED = booleanPreferencesKey("ad_block_enabled")
     }
     
     val settings: Flow<TutuSettings> = context.dataStore.data
@@ -68,7 +70,9 @@ class SettingsDataStore(private val context: Context) {
                             DefaultBookmarks
                         }
                     } ?: DefaultBookmarks,
-                    isFirstLaunch = prefs[FIRST_LAUNCH] ?: true
+                    isFirstLaunch = prefs[FIRST_LAUNCH] ?: true,
+                    searchEngine = prefs[SEARCH_ENGINE] ?: "GOOGLE",
+                    adBlockEnabled = prefs[AD_BLOCK_ENABLED] ?: true
                 )
             } catch (e: Exception) {
                 Log.e(TAG, "Error creating settings", e)
@@ -184,6 +188,26 @@ class SettingsDataStore(private val context: Context) {
         }
     }
     
+    suspend fun updateSearchEngine(engine: String) {
+        try {
+            context.dataStore.edit { prefs ->
+                prefs[SEARCH_ENGINE] = engine
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error saving search engine", e)
+        }
+    }
+
+    suspend fun updateAdBlockEnabled(enabled: Boolean) {
+        try {
+            context.dataStore.edit { prefs ->
+                prefs[AD_BLOCK_ENABLED] = enabled
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error saving ad block setting", e)
+        }
+    }
+
     suspend fun clearAll() {
         try {
             context.dataStore.edit { prefs ->
@@ -205,5 +229,7 @@ data class TutuSettings(
     val lastUrl: String? = null,
     val lastUrlInput: String? = null,
     val bookmarks: List<Bookmark> = DefaultBookmarks,
-    val isFirstLaunch: Boolean = true
+    val isFirstLaunch: Boolean = true,
+    val searchEngine: String = "GOOGLE",
+    val adBlockEnabled: Boolean = true
 )

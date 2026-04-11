@@ -65,6 +65,18 @@ class SettingsViewModel(
     fun onClearDataAcknowledged() {
         _clearDataSuccess.value = false
     }
+
+    fun setSearchEngine(engine: String) {
+        viewModelScope.launch {
+            settingsRepository.setSearchEngine(engine)
+        }
+    }
+
+    fun setAdBlockEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setAdBlockEnabled(enabled)
+        }
+    }
     
     class Factory(
         private val settingsRepository: SettingsRepository,

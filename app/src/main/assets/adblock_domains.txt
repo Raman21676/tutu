@@ -1,0 +1,244 @@
+# Nova Browser Ad/Tracker Blocklist
+# Curated from EasyList, EasyPrivacy, and Disconnect
+# Format: one domain per line
+# Lines starting with # are comments
+
+# === Major Ad Networks ===
+doubleclick.net
+googlesyndication.com
+googleadservices.com
+google-analytics.com
+googletagmanager.com
+googletagservices.com
+pagead2.googlesyndication.com
+adservice.google.com
+adsense.google.com
+adwords.google.com
+ads.google.com
+adclick.g.doubleclick.net
+ad.doubleclick.net
+static.doubleclick.net
+m.doubleclick.net
+mediavisor.doubleclick.net
+pubads.g.doubleclick.net
+securepubads.g.doubleclick.net
+www.googleadservices.com
+partner.googleadservices.com
+tpc.googlesyndication.com
+
+# === Facebook/Meta Ads ===
+an.facebook.com
+pixel.facebook.com
+ads.facebook.com
+www.facebook.com/tr
+connect.facebook.net/en_US/fbevents.js
+
+# === Amazon Ads ===
+aax.amazon-adsystem.com
+z-na.amazon-adsystem.com
+ir-na.amazon-adsystem.com
+fls-na.amazon.com
+ads.amazon.com
+mads.amazon.com
+device-metrics-us.amazon.com
+
+# === Microsoft/Bing Ads ===
+ads.msn.com
+a.ads2.msads.net
+ad.msn.com
+adnxs.com
+adnexus.net
+
+# === Twitter/X Ads ===
+ads-api.twitter.com
+ads.twitter.com
+analytics.twitter.com
+
+# === Major Ad Exchanges ===
+rubiconproject.com
+casalemedia.com
+pubmatic.com
+openx.net
+appnexus.com
+criteo.com
+criteo.net
+bidswitch.net
+sharethrough.com
+smartadserver.com
+indexexchange.com
+33across.com
+adsrvr.org
+adform.net
+quantserve.com
+quantcount.com
+
+# === Tracking & Analytics ===
+scorecardresearch.com
+sb.scorecardresearch.com
+hotjar.com
+script.hotjar.com
+static.hotjar.com
+fullstory.com
+rs.fullstory.com
+mouseflow.com
+clicktale.net
+crazyegg.com
+optimizely.com
+cdn.optimizely.com
+mixpanel.com
+api.mixpanel.com
+cdn.mxpnl.com
+segment.com
+api.segment.io
+cdn.segment.com
+amplitude.com
+api.amplitude.com
+cdn.amplitude.com
+heap.io
+heapanalytics.com
+cdn.heapanalytics.com
+
+# === Other Major Trackers ===
+omtrdc.net
+demdex.net
+everesttech.net
+adsymptotic.com
+taboola.com
+cdn.taboola.com
+trc.taboola.com
+outbrain.com
+widgets.outbrain.com
+paid.outbrain.com
+revcontent.com
+cdn.revcontent.com
+mgid.com
+servicer.mgid.com
+dt.adsafeprotected.com
+fw.adsafeprotected.com
+pixel.adsafeprotected.com
+static.adsafeprotected.com
+moatads.com
+z.moatads.com
+js.moatads.com
+pixel.moatads.com
+
+# === Popups & Overlays ===
+popads.net
+popcash.net
+propellerads.com
+adsterra.com
+juicyads.com
+exoclick.com
+exosrv.com
+trafficjunky.net
+trafficjunky.com
+
+# === Tracking Pixels ===
+px.ads.linkedin.com
+ad.linkedin.com
+snap.licdn.com
+p.adsymptotic.com
+bat.bing.com
+ct.pinterest.com
+t.co
+
+# === Mobile Ad SDKs ===
+app.adjust.com
+app.appsflyer.com
+cdn.appsflyer.com
+t.appsflyer.com
+app-measurement.com
+mobile.launchpad.com
+mobileapptracking.com
+app.link
+bnc.lt
+
+# === Content Delivery Trackers ===
+cdn.krxd.net
+beacon.krxd.net
+usermatch.krxd.net
+cdn.branch.io
+api.branch.io
+app.link
+
+# === Fingerprinting ===
+cdn.jsdelivr.net/npm/fingerprintjs2
+fpjs.io
+api.fpjs.io
+
+# === Data Collection ===
+sb.voicefive.com
+survey.g.doubleclick.net
+pagead.l.doubleclick.net
+cm.g.doubleclick.net
+
+# === Video Ad Networks ===
+imasdk.googleapis.com
+dai.google.com
+vid.springserve.com
+s.innovid.com
+search.spotxchange.com
+sync.search.spotxchange.com
+
+# === Retargeting ===
+ib.adnxs.com
+ads.stickyadstv.com
+match.adsrvr.org
+cm.adform.net
+dpm.demdex.net
+sync.outbrain.com
+
+# === Affiliate Tracking ===
+tracking.epicgames.com
+track.spe.schoolmessenger.com
+tracking.semrush.com
+
+# === Consent/Cookie Banners (popup blockers) ===
+cdn.cookielaw.org
+optanon.blob.core.windows.net
+consent.cookiebot.com
+consent.cookiefirst.com
+
+# === EU/GDPR Consent frameworks ===
+cmp.quantcast.com
+quantcast.mgr.consensu.org
+
+# === Chinese Ad Networks ===
+pos.baidu.com
+cpro.baidustatic.com
+hm.baidu.com
+hmcdn.baidu.com
+union.baidu.com
+
+# === Indian Ad Networks ===
+ads.inmobi.com
+cr.inmobi.com
+config.inmobi.com
+
+# === Email Tracking Pixels ===
+pixel.watch
+email.microsoftonline.com
+links.emails.economist.com
+
+# === Social Media Trackers ===
+platform.twitter.com/widgets.js
+connect.facebook.net
+platform.instagram.com
+static.ads-twitter.com
+
+# === Misc Ad Domains ===
+adcolony.com
+unityads.unity3d.com
+ads.mopub.com
+serving-sys.com
+bs.serving-sys.com
+adroll.com
+d.adroll.com
+s.adroll.com
+
+# === Malware/Scam Ad Networks ===
+go.onclasrv.com
+onclickads.net
+adf.ly
+sh.st
+bc.vc

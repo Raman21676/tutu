@@ -2,10 +2,16 @@ package com.nova.browser.domain.repository
 
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.util.Log
+import androidx.work.Data
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import com.nova.browser.data.local.db.DownloadDao
 import com.nova.browser.data.local.db.DownloadEntity
 import com.nova.browser.service.DownloadService
+import com.nova.browser.worker.DownloadStatusWorker
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
@@ -28,14 +34,22 @@ class DownloadRepository @Inject constructor(
     fun getActiveDownloads(): Flow<List<DownloadEntity>> =
         downloadDao.getDownloadsByStatus(DownloadEntity.STATUS_RUNNING)
 
+    suspend fun getDownloadById(id: Long): DownloadEntity? = downloadDao.getDownloadById(id)
+
     /**
-     * Start a new download using the custom download service
-     * This supports pause/resume and background downloads
+     * Start a new download using the custom download service.
+     * Supports pause/resume via OkHttp with HTTP Range headers.
      */
-    suspend fun startDownload(url: String, fileName: String, mimeType: String): Long {
+    suspend fun startDownload(
+        url: String,
+        fileName: String,
+        mimeType: String,
+        cookies: String? = null,
+        userAgent: String? = null
+    ): Long {
         // Generate unique ID
         val downloadId = System.currentTimeMillis()
-        
+
         // Save to database first
         val download = DownloadEntity(
             id = downloadId,
@@ -47,9 +61,9 @@ class DownloadRepository @Inject constructor(
             downloadedBytes = 0,
             status = DownloadEntity.STATUS_PENDING
         )
-        
+
         downloadDao.insert(download)
-        
+
         // Start the download service
         val intent = Intent(context, DownloadService::class.java).apply {
             action = DownloadService.ACTION_START
@@ -57,11 +71,21 @@ class DownloadRepository @Inject constructor(
             putExtra(DownloadService.EXTRA_URL, url)
             putExtra(DownloadService.EXTRA_FILE_NAME, fileName)
             putExtra(DownloadService.EXTRA_MIME_TYPE, mimeType)
+            cookies?.let { putExtra(DownloadService.EXTRA_COOKIES, it) }
+            userAgent?.let { putExtra(DownloadService.EXTRA_USER_AGENT, it) }
         }
-        
-        context.startService(intent)
-        
-        Log.d(TAG, "Started download $downloadId: $fileName")
+
+        // Use startForegroundService on Android 8+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(intent)
+        } else {
+            context.startService(intent)
+        }
+
+        // Enqueue status monitoring worker as fallback
+        enqueueStatusWorker(downloadId)
+
+        Log.d(TAG, "Started download $downloadId: $fileName (cookies=${cookies != null}, ua=${userAgent != null})")
         return downloadId
     }
 
@@ -85,7 +109,11 @@ class DownloadRepository @Inject constructor(
             action = DownloadService.ACTION_RESUME
             putExtra(DownloadService.EXTRA_DOWNLOAD_ID, id)
         }
-        context.startService(intent)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(intent)
+        } else {
+            context.startService(intent)
+        }
         Log.d(TAG, "Resumed download $id")
     }
 
@@ -137,8 +165,23 @@ class DownloadRepository @Inject constructor(
         downloadDao.updateFilePath(id, filePath)
     }
 
-    fun startTracking(downloadId: Long) {
-        // Not needed with custom download service
-        // Progress is tracked internally
+    /**
+     * Enqueue a worker to monitor download status and ensure it doesn't get stuck.
+     */
+    private fun enqueueStatusWorker(downloadId: Long) {
+        val workRequest = OneTimeWorkRequestBuilder<DownloadStatusWorker>()
+            .setInputData(
+                Data.Builder()
+                    .putLong(DownloadStatusWorker.KEY_DOWNLOAD_ID, downloadId)
+                    .build()
+            )
+            .addTag("download_$downloadId")
+            .build()
+
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            "${DownloadStatusWorker.WORK_NAME}_$downloadId",
+            ExistingWorkPolicy.KEEP,
+            workRequest
+        )
     }
 }

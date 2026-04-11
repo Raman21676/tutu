@@ -31,6 +31,8 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Tab
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.VisibilityOff
 
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
@@ -61,6 +63,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.nova.browser.R
 import com.nova.browser.data.local.entity.DefaultBookmarks
+import com.nova.browser.data.model.SearchEngine
 import com.nova.browser.ui.components.AppIcon
 import com.nova.browser.ui.components.BookmarkCard
 import com.nova.browser.ui.components.ToggleSwitch
@@ -71,7 +74,6 @@ import com.nova.browser.ui.viewmodel.HomeViewModel
 import com.nova.browser.util.buildUrl
 import com.nova.browser.util.openInExternalBrowser
 import com.nova.browser.ui.screens.rememberQrScanLauncher
-import com.nova.browser.ui.components.BookmarkCard
 
 @Composable
 fun HomeScreen(
@@ -81,6 +83,7 @@ fun HomeScreen(
     onNavigateToHistory: () -> Unit = {},
     onNavigateToDownloads: () -> Unit = {},
     onNavigateToTabs: () -> Unit = {},
+    onNavigateToIncognito: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val bookmarks by viewModel.bookmarks.collectAsState()
@@ -110,11 +113,12 @@ fun HomeScreen(
     
     val context = LocalContext.current
     val isFirstLaunch by viewModel.isFirstLaunch.collectAsState()
+    val selectedSearchEngine = SearchEngine.fromName(settings.searchEngine)
     
     // QR Scanner launcher
     val qrScanLauncher = rememberQrScanLauncher { scannedUrl ->
         urlInput = scannedUrl
-        val builtUrl = scannedUrl.buildUrl(settings.httpsEnabled)
+        val builtUrl = scannedUrl.buildUrl(settings.httpsEnabled, selectedSearchEngine)
         onNavigateToWeb(builtUrl)
     }
     
@@ -194,6 +198,26 @@ fun HomeScreen(
                     modifier = Modifier.size(28.dp)
                 )
             }
+            
+            // Incognito Button
+            IconButton(
+                onClick = {
+                    if (urlInput.isNotBlank()) {
+                        val builtUrl = urlInput.buildUrl(settings.httpsEnabled, selectedSearchEngine)
+                        onNavigateToIncognito(builtUrl)
+                    } else {
+                        onNavigateToIncognito("https://www.google.com")
+                    }
+                },
+                modifier = Modifier.size(48.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.VisibilityOff,
+                    contentDescription = "Incognito",
+                    tint = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
         }
         
         // Logo
@@ -224,7 +248,7 @@ fun HomeScreen(
             onValueChange = { urlInput = it },
             onSubmit = {
                 if (urlInput.isNotBlank()) {
-                    val builtUrl = urlInput.buildUrl(settings.httpsEnabled)
+                    val builtUrl = urlInput.buildUrl(settings.httpsEnabled, selectedSearchEngine)
                     onNavigateToWeb(builtUrl)
                 }
             },
@@ -264,6 +288,14 @@ fun HomeScreen(
             icon = Icons.Default.SettingsBrightness
         )
         
+        // Ad Blocker Toggle
+        ToggleSwitch(
+            checked = settings.adBlockEnabled,
+            onCheckedChange = { viewModel.setAdBlockEnabled(it) },
+            title = "Block Ads & Trackers",
+            icon = Icons.Default.Shield
+        )
+        
         if (!settings.followSystemTheme) {
             ToggleSwitch(
                 checked = settings.darkMode,
@@ -279,7 +311,7 @@ fun HomeScreen(
         Button(
             onClick = {
                 if (urlInput.isNotBlank()) {
-                    val builtUrl = urlInput.buildUrl(settings.httpsEnabled)
+                    val builtUrl = urlInput.buildUrl(settings.httpsEnabled, selectedSearchEngine)
                     onNavigateToWeb(builtUrl)
                 }
             },
@@ -304,7 +336,7 @@ fun HomeScreen(
         OutlinedButton(
             onClick = {
                 if (urlInput.isNotBlank()) {
-                    val builtUrl = urlInput.buildUrl(settings.httpsEnabled)
+                    val builtUrl = urlInput.buildUrl(settings.httpsEnabled, selectedSearchEngine)
                     context.openInExternalBrowser(builtUrl)
                 }
             },
@@ -376,7 +408,7 @@ fun HomeScreen(
                         bookmark = bookmark,
                         onClick = {
                             urlInput = bookmark.url
-                            val builtUrl = bookmark.url.buildUrl(settings.httpsEnabled)
+                            val builtUrl = bookmark.url.buildUrl(settings.httpsEnabled, selectedSearchEngine)
                             onNavigateToWeb(builtUrl)
                         },
                         onDelete = {

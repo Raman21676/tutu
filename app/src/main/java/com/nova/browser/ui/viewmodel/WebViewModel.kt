@@ -32,10 +32,14 @@ class WebViewModel(
     private val _fullscreen = MutableStateFlow(false)
     val fullscreen: StateFlow<Boolean> = _fullscreen.asStateFlow()
     
+    private val _adBlockEnabled = MutableStateFlow(true)
+    val adBlockEnabled: StateFlow<Boolean> = _adBlockEnabled.asStateFlow()
+    
     init {
         viewModelScope.launch {
             settingsRepository.settings.collect { settings ->
                 _fullscreen.value = settings.fullscreen
+                _adBlockEnabled.value = settings.adBlockEnabled
             }
         }
     }

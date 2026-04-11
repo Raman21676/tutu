@@ -132,6 +132,18 @@ class HomeViewModel(
             settingsRepository.setFollowSystemTheme(enabled)
         }
     }
+
+    fun setAdBlockEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setAdBlockEnabled(enabled)
+        }
+    }
+
+    fun setSearchEngine(engine: String) {
+        viewModelScope.launch {
+            settingsRepository.setSearchEngine(engine)
+        }
+    }
     
     fun addBookmark(title: String, url: String, color: Long? = null) {
         viewModelScope.launch {

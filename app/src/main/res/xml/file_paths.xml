@@ -6,6 +6,9 @@
     <!-- External Downloads folder specifically -->
     <external-path name="downloads" path="Download/" />
     
+    <!-- Nova Downloads folder -->
+    <external-path name="nova_downloads" path="Download/Nova Downloads/" />
+    
     <!-- App-specific external files -->
     <external-files-path name="app_external_files" path="." />
     

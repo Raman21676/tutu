@@ -1,22 +1,26 @@
 package com.nova.browser.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.RotateRight
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
-
 import androidx.compose.material.icons.filled.RememberMe
-import androidx.compose.material.icons.automirrored.filled.RotateRight
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -25,6 +29,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -36,14 +42,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.nova.browser.BuildConfig
 import com.nova.browser.R
+import com.nova.browser.data.model.SearchEngine
 import com.nova.browser.ui.components.ToggleSwitch
 import com.nova.browser.ui.theme.CoralRed
 import com.nova.browser.ui.theme.TutuTheme
@@ -59,6 +67,7 @@ fun SettingsScreen(
     val settings by viewModel.settings.collectAsState()
     val clearDataSuccess by viewModel.clearDataSuccess.collectAsState()
     var showClearDataDialog by remember { mutableStateOf(false) }
+    var showSearchEngineDialog by remember { mutableStateOf(false) }
     
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -117,12 +126,50 @@ fun SettingsScreen(
                 icon = Icons.Default.RememberMe
             )
             
+            // Search Engine Selector
+            val currentEngine = SearchEngine.fromName(settings.searchEngine)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showSearchEngineDialog = true }
+                    .padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(end = 12.dp)
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Search Engine",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = currentEngine.displayName,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            
             Spacer(modifier = Modifier.height(24.dp))
             HorizontalDivider()
             Spacer(modifier = Modifier.height(24.dp))
             
             // Privacy Section
             SectionTitle(stringResource(R.string.settings_privacy))
+            
+            // Ad Blocker Toggle
+            ToggleSwitch(
+                checked = settings.adBlockEnabled,
+                onCheckedChange = { viewModel.setAdBlockEnabled(it) },
+                title = "Block Ads & Trackers",
+                icon = Icons.Default.Shield
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
             
             Button(
                 onClick = { showClearDataDialog = true },
@@ -182,6 +229,56 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth()
             )
         }
+    }
+    
+    // Search Engine Selection Dialog
+    if (showSearchEngineDialog) {
+        AlertDialog(
+            onDismissRequest = { showSearchEngineDialog = false },
+            title = { 
+                Text(
+                    "Search Engine", 
+                    fontWeight = FontWeight.Bold
+                ) 
+            },
+            text = {
+                Column {
+                    SearchEngine.entries.forEach { engine ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    viewModel.setSearchEngine(engine.name)
+                                    showSearchEngineDialog = false
+                                }
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = settings.searchEngine == engine.name,
+                                onClick = {
+                                    viewModel.setSearchEngine(engine.name)
+                                    showSearchEngineDialog = false
+                                },
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = CoralRed
+                                )
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = engine.displayName,
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showSearchEngineDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
     
     // Clear Data Confirmation Dialog

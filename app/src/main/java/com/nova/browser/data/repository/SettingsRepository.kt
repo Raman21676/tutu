@@ -49,6 +49,14 @@ class SettingsRepository @Inject constructor(
         dataStore.setFirstLaunchComplete()
     }
     
+    suspend fun setSearchEngine(engine: String) {
+        dataStore.updateSearchEngine(engine)
+    }
+
+    suspend fun setAdBlockEnabled(enabled: Boolean) {
+        dataStore.updateAdBlockEnabled(enabled)
+    }
+
     suspend fun clearAll() {
         dataStore.clearAll()
     }
