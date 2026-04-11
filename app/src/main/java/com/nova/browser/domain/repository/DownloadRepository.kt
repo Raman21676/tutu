@@ -165,6 +165,10 @@ class DownloadRepository @Inject constructor(
         downloadDao.updateFilePath(id, filePath)
     }
 
+    suspend fun updateFileName(id: Long, fileName: String) {
+        downloadDao.updateFileName(id, fileName)
+    }
+
     /**
      * Enqueue a worker to monitor download status and ensure it doesn't get stuck.
      */

@@ -150,6 +150,8 @@ class DownloadService : Service() {
         cookies: String?,
         userAgent: String?
     ) {
+        Log.d(TAG, "startDownload called: id=$downloadId, fileName='$fileName', url=$url")
+        
         if (activeDownloads.containsKey(downloadId)) {
             Log.d(TAG, "Download $downloadId already active")
             return
@@ -157,6 +159,12 @@ class DownloadService : Service() {
 
         val downloadDir = getDownloadDir()
         val file = getUniqueFile(downloadDir, fileName)
+        Log.d(TAG, "Unique file determined: ${file.name} (original: '$fileName')")
+        
+        // Update the filename in database to match the actual unique filename
+        serviceScope.launch {
+            downloadRepository.updateFileName(downloadId, file.name)
+        }
 
         val job = serviceScope.launch {
             try {

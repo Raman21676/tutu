@@ -50,6 +50,7 @@ import androidx.compose.material.icons.filled.PictureInPicture
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Tab
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -288,6 +289,17 @@ fun WebScreen(
                             }
                         },
                         actions = {
+                            // New Tab button - allows opening new tab without leaving current video
+                            IconButton(onClick = {
+                                tabManager.addTab()
+                                onNavigateToTabs()
+                            }) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = "New Tab"
+                                )
+                            }
+                            
                             // Reading Mode toggle
                             IconButton(onClick = {
                                 webView?.let { isReadingMode = ReadingModeInjector.toggle(it, isReadingMode) }
@@ -542,19 +554,16 @@ fun WebScreen(
                                 val downloadExtensions = listOf(".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".zip", ".rar", ".apk", ".mp3", ".mp4")
                                 val lowerUrl = url.lowercase()
                                 if (downloadExtensions.any { lowerUrl.endsWith(it) || lowerUrl.contains("/download") || lowerUrl.contains("download/") }) {
-                                    val fileName = url.substringAfterLast("/", "download")
+                                    val fileName = url.substringAfterLast("/", "download").takeIf { it.isNotEmpty() && it.contains(".") } 
+                                        ?: url.substringBeforeLast("/").substringAfterLast("/", "download").takeIf { it.isNotEmpty() }
+                                        ?: "download"
                                     val download = PendingDownload(
                                         url = url,
                                         fileName = fileName,
                                         userAgent = request.requestHeaders?.get("User-Agent") ?: view.settings.userAgentString
                                     )
-                                    // Check permission for Android 9 and below
-                                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
-                                        ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-                                        Toast.makeText(context, "Please grant storage permission in Settings to download files", Toast.LENGTH_LONG).show()
-                                        return true
-                                    }
-                                    executeDownload(context, download, downloadRepository)
+                                    // Use checkAndDownload to handle permission properly
+                                    checkAndDownload(download, downloadRepository)
                                     return true
                                 }
                                 
@@ -746,7 +755,9 @@ fun WebScreen(
                                                             // This is a download - cancel loading and use DownloadManager
                                                             view?.stopLoading()
                                                             
-                                                            val fileName = newUrl.substringAfterLast("/", "download").takeIf { it.contains(".") } ?: "download.pdf"
+                                                            val fileName = newUrl.substringAfterLast("/", "download").takeIf { it.isNotEmpty() && it.contains(".") } 
+                                                                ?: newUrl.substringBeforeLast("/").substringAfterLast("/", "download").takeIf { it.isNotEmpty() }
+                                                                ?: "download.pdf"
                                                             val download = PendingDownload(
                                                                 url = newUrl,
                                                                 fileName = fileName,

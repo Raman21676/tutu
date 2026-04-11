@@ -26,6 +26,9 @@ interface DownloadDao {
     @Query("UPDATE downloads SET filePath = :filePath WHERE id = :id")
     suspend fun updateFilePath(id: Long, filePath: String)
 
+    @Query("UPDATE downloads SET fileName = :fileName WHERE id = :id")
+    suspend fun updateFileName(id: Long, fileName: String)
+
     @Query("UPDATE downloads SET status = :status WHERE id = :id")
     suspend fun updateStatus(id: Long, status: Int)
 
