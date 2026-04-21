@@ -57,6 +57,10 @@ class SettingsRepository @Inject constructor(
         dataStore.updateAdBlockEnabled(enabled)
     }
 
+    suspend fun setDownloadDirectory(uri: String) {
+        dataStore.updateDownloadDirectory(uri)
+    }
+
     suspend fun clearAll() {
         dataStore.clearAll()
     }

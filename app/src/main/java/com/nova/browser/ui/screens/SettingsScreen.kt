@@ -1,5 +1,9 @@
 package com.nova.browser.ui.screens
 
+import android.content.Intent
+import android.provider.DocumentsContract
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,6 +19,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.RotateRight
 import androidx.compose.material.icons.filled.CleaningServices
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
@@ -44,6 +50,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -68,6 +75,21 @@ fun SettingsScreen(
     val clearDataSuccess by viewModel.clearDataSuccess.collectAsState()
     var showClearDataDialog by remember { mutableStateOf(false) }
     var showSearchEngineDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    
+    // Folder picker launcher
+    val folderPickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        uri?.let {
+            // Take persistent read+write permissions so it survives app restarts
+            context.contentResolver.takePersistableUriPermission(
+                it,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            )
+            viewModel.setDownloadDirectory(it.toString())
+        }
+    }
     
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -204,6 +226,53 @@ fun SettingsScreen(
             HorizontalDivider()
             Spacer(modifier = Modifier.height(24.dp))
             
+            // Downloads Section
+            SectionTitle("Downloads")
+            
+            // Download folder row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { folderPickerLauncher.launch(null) }
+                    .padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Folder,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(end = 12.dp)
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Download Folder",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = if (settings.downloadDirUri.isEmpty()) 
+                            "Nova Downloads (Default)" 
+                        else 
+                            getFolderDisplayName(settings.downloadDirUri),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                // Reset-to-default button (shown only when custom dir is set)
+                if (settings.downloadDirUri.isNotEmpty()) {
+                    IconButton(onClick = { viewModel.setDownloadDirectory("") }) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Reset to default",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            HorizontalDivider()
+            Spacer(modifier = Modifier.height(24.dp))
+            
             // About Section
             SectionTitle(stringResource(R.string.settings_about))
             
@@ -330,6 +399,26 @@ private fun SectionTitle(title: String) {
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.padding(vertical = 12.dp)
     )
+}
+
+/**
+ * Extract a human-readable folder name from a SAF tree URI.
+ * e.g. content://com.android.externalstorage.documents/tree/primary%3AMovies → "Movies"
+ */
+private fun getFolderDisplayName(uriString: String): String {
+    return try {
+        val uri = android.net.Uri.parse(uriString)
+        val docId = DocumentsContract.getTreeDocumentId(uri)
+        val parts = docId.split(":")
+        if (parts.size >= 2) {
+            val path = parts[1]
+            path.split("/").last().ifEmpty { path }.ifEmpty { "Custom Folder" }
+        } else {
+            "Custom Folder"
+        }
+    } catch (e: Exception) {
+        "Custom Folder"
+    }
 }
 
 @Preview

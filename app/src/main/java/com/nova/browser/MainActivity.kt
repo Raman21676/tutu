@@ -234,14 +234,19 @@ private fun TutuNavigation(
             TabsScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToWeb = { url ->
-                    navController.popBackStack()
                     if (url.isNotEmpty()) {
+                        // Existing tab with URL — pop Tabs and go to that page
+                        navController.popBackStack()
                         val encodedUrl = URLEncoder.encode(url, StandardCharsets.UTF_8.toString())
                         navController.navigate(Screen.Web.createRoute(encodedUrl))
+                    } else {
+                        // New/empty tab — go to Home so user can type a URL fresh
+                        navController.popBackStack(Screen.Home.route, inclusive = false)
                     }
                 }
             )
         }
+
 
         composable(Screen.Bookmarks.route) {
             val scope = androidx.compose.runtime.rememberCoroutineScope()

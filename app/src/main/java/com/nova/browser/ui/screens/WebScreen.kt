@@ -508,7 +508,8 @@ fun WebScreen(
                                 fileName = fileName,
                                 userAgent = userAgent,
                                 cookies = cookie,
-                                mimeType = mimetype
+                                mimeType = mimetype,
+                                referer = this.url  // current WebView page URL as HTTP Referer
                             )
                             
                             // Use checkAndDownload to handle permission
@@ -550,19 +551,22 @@ fun WebScreen(
                                     } catch (e: Exception) { true }
                                 }
                                 
-                                // Handle direct file downloads (PDF, etc)
-                                val downloadExtensions = listOf(".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".zip", ".rar", ".apk", ".mp3", ".mp4")
+                                // Handle direct file downloads by extension ONLY.
+                                // Do NOT intercept by "/download" path — that grabs pages before
+                                // the server response, causing HTML to be downloaded instead of the file.
+                                // setDownloadListener handles server-sent Content-Disposition: attachment.
+                                val downloadExtensions = listOf(".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".zip", ".rar", ".apk", ".mp3", ".mp4", ".epub", ".csv")
                                 val lowerUrl = url.lowercase()
-                                if (downloadExtensions.any { lowerUrl.endsWith(it) || lowerUrl.contains("/download") || lowerUrl.contains("download/") }) {
-                                    val fileName = url.substringAfterLast("/", "download").takeIf { it.isNotEmpty() && it.contains(".") } 
-                                        ?: url.substringBeforeLast("/").substringAfterLast("/", "download").takeIf { it.isNotEmpty() }
-                                        ?: "download"
+                                if (downloadExtensions.any { lowerUrl.endsWith(it) }) {
+                                    val fileName = android.webkit.URLUtil.guessFileName(url, null, null)
+                                    val cookie = cookieManager.getCookie(url)
                                     val download = PendingDownload(
                                         url = url,
                                         fileName = fileName,
-                                        userAgent = request.requestHeaders?.get("User-Agent") ?: view.settings.userAgentString
+                                        userAgent = request.requestHeaders?.get("User-Agent") ?: view.settings.userAgentString,
+                                        cookies = cookie,
+                                        referer = view.url  // current page URL as HTTP Referer
                                     )
-                                    // Use checkAndDownload to handle permission properly
                                     checkAndDownload(download, downloadRepository)
                                     return true
                                 }
@@ -816,11 +820,12 @@ data class PendingDownload(
     val fileName: String,
     val userAgent: String? = null,
     val cookies: String? = null,
-    val mimeType: String? = null
+    val mimeType: String? = null,
+    val referer: String? = null  // HTTP Referer: the page that triggered the download
 )
 
 // Execute the download using custom DownloadService (OkHttp with pause/resume)
-// Downloads are saved to the "Nova Downloads" folder
+// Downloads are saved to the "Nova Downloads" folder (or user-configured folder)
 private fun executeDownload(
     context: android.content.Context, 
     download: PendingDownload,
@@ -834,7 +839,8 @@ private fun executeDownload(
                     fileName = download.fileName,
                     mimeType = download.mimeType ?: "application/octet-stream",
                     cookies = download.cookies,
-                    userAgent = download.userAgent
+                    userAgent = download.userAgent,
+                    referer = download.referer
                 )
                 Log.d("WebScreen", "=== Download started via DownloadService: ${download.fileName} (id=$downloadId)")
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
@@ -1034,78 +1040,42 @@ private fun injectDownloadInterceptor(webView: WebView) {
             if (window.__downloadInterceptorInstalled) return;
             window.__downloadInterceptorInstalled = true;
             
-            console.log('[TuTu] Download interceptor installed');
+            console.log('[Nova] Download interceptor installed');
             
-            // Log all clicks for debugging
-            document.addEventListener('click', function(e) {
-                var el = e.target.closest('a, button');
-                if (el) {
-                    var href = el.href || '';
-                    var hasDownload = el.hasAttribute('download');
-                    var downloadAttr = el.getAttribute('download') || '';
-                    console.log('[TuTu] Click detected:', el.tagName, href, hasDownload, downloadAttr);
-                    
-                    // Check if it's a download link
-                    if (hasDownload || href.match(/\.(pdf|doc|docx|xls|xlsx|zip|rar|apk)$/i)) {
-                        console.log('[TuTu] Download link clicked:', href);
-                        AndroidDownload.onDownloadClick(href, downloadAttr || href.split('/').pop() || 'download');
-                    }
-                }
-            }, true);
-            
-            // Intercept fetch() that returns blobs
-            var originalFetch = window.fetch;
-            window.fetch = function() {
-                var url = arguments[0];
-                console.log('[TuTu] fetch intercepted:', url);
-                return originalFetch.apply(this, arguments).then(function(response) {
-                    if (response.headers.get('content-type')?.includes('application/pdf') ||
-                        url.toString().match(/\.(pdf|doc|docx)$/i)) {
-                        console.log('[TuTu] fetch download detected:', url);
-                        AndroidDownload.onFetchDetected(url.toString(), response.headers.get('content-type') || 'application/octet-stream');
-                    }
-                    return response;
-                });
-            };
-            
-            // Intercept XMLHttpRequest for downloads
-            var originalXHR = window.XMLHttpRequest;
-            window.XMLHttpRequest = function() {
-                var xhr = new originalXHR();
-                var originalOpen = xhr.open;
-                xhr.open = function(method, url) {
-                    console.log('[TuTu] XHR intercepted:', url);
-                    if (url.toString().match(/\.(pdf|doc|docx|zip|rar)$/i)) {
-                        AndroidDownload.onXhrDetected(url.toString());
-                    }
-                    return originalOpen.apply(this, arguments);
-                };
-                return xhr;
-            };
-            
-            // Intercept window.open for downloads
-            var originalOpen = window.open;
-            window.open = function(url, target, features) {
-                console.log('[TuTu] window.open intercepted:', url);
-                if (url && url.toString().match(/\.(pdf|doc|docx|zip|rar)$/i)) {
-                    AndroidDownload.onWindowOpen(url.toString());
-                    return null; // Prevent actual window opening
-                }
-                return originalOpen.apply(this, arguments);
-            };
+            // NOTE: We do NOT intercept <a href download> clicks here.
+            // setDownloadListener() handles those correctly with Referer + cookies.
+            // This interceptor ONLY handles dynamically-generated blob: URLs that
+            // the native downloader cannot catch.
             
             // Monitor URL.createObjectURL for blob downloads
             var originalCreateObjectURL = URL.createObjectURL;
             URL.createObjectURL = function(blob) {
                 var url = originalCreateObjectURL.call(URL, blob);
-                console.log('[TuTu] Blob URL created:', url, 'type:', blob.type);
-                if (blob.type?.includes('pdf') || blob.type?.includes('octet-stream')) {
+                console.log('[Nova] Blob URL created:', url, 'type:', blob.type);
+                if (blob.type && (blob.type.includes('pdf') || blob.type.includes('octet-stream') ||
+                    blob.type.includes('zip') || blob.type.includes('msword') ||
+                    blob.type.includes('spreadsheet') || blob.type.includes('presentation'))) {
                     AndroidDownload.onBlobCreated(url, blob.type || 'application/octet-stream');
                 }
                 return url;
             };
             
-            console.log('[TuTu] All download interceptors installed');
+            // Intercept fetch() responses that are file downloads
+            var originalFetch = window.fetch;
+            window.fetch = function() {
+                var url = arguments[0];
+                return originalFetch.apply(this, arguments).then(function(response) {
+                    var ct = response.headers.get('content-type') || '';
+                    if (ct.includes('application/pdf') || ct.includes('octet-stream') ||
+                        ct.includes('application/zip')) {
+                        console.log('[Nova] fetch download detected:', url);
+                        AndroidDownload.onFetchDetected(url.toString(), ct);
+                    }
+                    return response;
+                });
+            };
+            
+            console.log('[Nova] Blob/fetch interceptors installed');
         })();
     """.trimIndent(), null)
 }

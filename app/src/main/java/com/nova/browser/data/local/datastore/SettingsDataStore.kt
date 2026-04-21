@@ -43,6 +43,7 @@ class SettingsDataStore(private val context: Context) {
         val FIRST_LAUNCH = booleanPreferencesKey("first_launch")
         val SEARCH_ENGINE = stringPreferencesKey("search_engine")
         val AD_BLOCK_ENABLED = booleanPreferencesKey("ad_block_enabled")
+        val DOWNLOAD_DIR_URI = stringPreferencesKey("download_dir_uri")
     }
     
     val settings: Flow<TutuSettings> = context.dataStore.data
@@ -72,7 +73,8 @@ class SettingsDataStore(private val context: Context) {
                     } ?: DefaultBookmarks,
                     isFirstLaunch = prefs[FIRST_LAUNCH] ?: true,
                     searchEngine = prefs[SEARCH_ENGINE] ?: "GOOGLE",
-                    adBlockEnabled = prefs[AD_BLOCK_ENABLED] ?: true
+                    adBlockEnabled = prefs[AD_BLOCK_ENABLED] ?: true,
+                    downloadDirUri = prefs[DOWNLOAD_DIR_URI] ?: ""
                 )
             } catch (e: Exception) {
                 Log.e(TAG, "Error creating settings", e)
@@ -208,6 +210,20 @@ class SettingsDataStore(private val context: Context) {
         }
     }
 
+    suspend fun updateDownloadDirectory(uri: String) {
+        try {
+            context.dataStore.edit { prefs ->
+                if (uri.isEmpty()) {
+                    prefs.remove(DOWNLOAD_DIR_URI)
+                } else {
+                    prefs[DOWNLOAD_DIR_URI] = uri
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error saving download directory", e)
+        }
+    }
+
     suspend fun clearAll() {
         try {
             context.dataStore.edit { prefs ->
@@ -231,5 +247,6 @@ data class TutuSettings(
     val bookmarks: List<Bookmark> = DefaultBookmarks,
     val isFirstLaunch: Boolean = true,
     val searchEngine: String = "GOOGLE",
-    val adBlockEnabled: Boolean = true
+    val adBlockEnabled: Boolean = true,
+    val downloadDirUri: String = ""
 )

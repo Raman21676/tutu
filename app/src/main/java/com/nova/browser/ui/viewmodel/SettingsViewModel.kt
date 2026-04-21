@@ -77,6 +77,12 @@ class SettingsViewModel(
             settingsRepository.setAdBlockEnabled(enabled)
         }
     }
+
+    fun setDownloadDirectory(uri: String) {
+        viewModelScope.launch {
+            settingsRepository.setDownloadDirectory(uri)
+        }
+    }
     
     class Factory(
         private val settingsRepository: SettingsRepository,

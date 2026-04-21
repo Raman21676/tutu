@@ -13,6 +13,7 @@ import android.os.Binder
 import android.os.Build
 import android.os.Environment
 import android.os.IBinder
+import android.provider.DocumentsContract
 import android.provider.MediaStore
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -65,6 +66,8 @@ class DownloadService : Service() {
         const val EXTRA_MIME_TYPE = "mime_type"
         const val EXTRA_COOKIES = "cookies"
         const val EXTRA_USER_AGENT = "user_agent"
+        const val EXTRA_REFERER = "referer"
+        const val EXTRA_DIR_URI = "dir_uri"
         
         const val DOWNLOAD_FOLDER_NAME = "Nova Downloads"
         
@@ -101,7 +104,9 @@ class DownloadService : Service() {
                 val mimeType = intent.getStringExtra(EXTRA_MIME_TYPE) ?: "*/*"
                 val cookies = intent.getStringExtra(EXTRA_COOKIES)
                 val userAgent = intent.getStringExtra(EXTRA_USER_AGENT)
-                startDownload(downloadId, url, fileName, mimeType, cookies, userAgent)
+                val referer = intent.getStringExtra(EXTRA_REFERER)
+                val dirUri = intent.getStringExtra(EXTRA_DIR_URI)
+                startDownload(downloadId, url, fileName, mimeType, cookies, userAgent, referer, dirUri)
             }
             ACTION_PAUSE -> pauseDownload(downloadId)
             ACTION_RESUME -> resumeDownload(downloadId)
@@ -112,16 +117,49 @@ class DownloadService : Service() {
     }
 
     /**
-     * Get or create the "Nova Downloads" directory.
-     * On all Android versions, we use the public Downloads/Nova Downloads/ path.
+     * Get the download directory.
+     * If a SAF tree URI is provided (user-chosen folder), convert it to a File path.
+     * Falls back to public Downloads/Nova Downloads/ on any failure.
      */
-    private fun getDownloadDir(): File {
+    private fun getDownloadDir(dirUri: String? = null): File {
+        if (!dirUri.isNullOrEmpty()) {
+            val path = convertSAFUriToPath(dirUri)
+            if (path != null) {
+                val dir = File(path)
+                if (dir.exists() || dir.mkdirs()) {
+                    Log.d(TAG, "Using custom download dir: ${dir.absolutePath}")
+                    return dir
+                }
+            }
+        }
         val publicDownloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
         val novaDir = File(publicDownloads, DOWNLOAD_FOLDER_NAME)
         if (!novaDir.exists()) {
             novaDir.mkdirs()
         }
         return novaDir
+    }
+
+    /**
+     * Convert a SAF tree URI (content://com.android.externalstorage.documents/tree/primary%3A...)
+     * to an absolute File path for primary (internal) storage.
+     * Returns null for external SD cards or unknown authorities.
+     */
+    private fun convertSAFUriToPath(uriString: String): String? {
+        return try {
+            val uri = Uri.parse(uriString)
+            if (uri.authority == "com.android.externalstorage.documents") {
+                val docId = DocumentsContract.getTreeDocumentId(uri)
+                val split = docId.split(":")
+                if (split.size >= 2 && split[0] == "primary") {
+                    val relativePath = split[1]
+                    "/storage/emulated/0/$relativePath"
+                } else null
+            } else null
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not convert SAF URI to path: $uriString", e)
+            null
+        }
     }
 
     /**
@@ -148,7 +186,9 @@ class DownloadService : Service() {
         fileName: String, 
         mimeType: String,
         cookies: String?,
-        userAgent: String?
+        userAgent: String?,
+        referer: String? = null,
+        dirUri: String? = null
     ) {
         Log.d(TAG, "startDownload called: id=$downloadId, fileName='$fileName', url=$url")
         
@@ -157,7 +197,7 @@ class DownloadService : Service() {
             return
         }
 
-        val downloadDir = getDownloadDir()
+        val downloadDir = getDownloadDir(dirUri)
         val file = getUniqueFile(downloadDir, fileName)
         Log.d(TAG, "Unique file determined: ${file.name} (original: '$fileName')")
         
@@ -169,7 +209,7 @@ class DownloadService : Service() {
         val job = serviceScope.launch {
             try {
                 downloadRepository.updateStatus(downloadId, DownloadEntity.STATUS_RUNNING)
-                performDownload(downloadId, url, file, mimeType, cookies, userAgent)
+                performDownload(downloadId, url, file, mimeType, cookies, userAgent, referer)
             } catch (e: CancellationException) {
                 Log.d(TAG, "Download $downloadId cancelled")
             } catch (e: Exception) {
@@ -186,7 +226,7 @@ class DownloadService : Service() {
             }
         }
 
-        activeDownloads[downloadId] = DownloadJob(job, file, url, mimeType, cookies, userAgent)
+        activeDownloads[downloadId] = DownloadJob(job, file, url, mimeType, cookies, userAgent, referer, dirUri)
         startForeground(NOTIFICATION_ID, createNotification())
     }
 
@@ -196,7 +236,8 @@ class DownloadService : Service() {
         file: File,
         mimeType: String,
         cookies: String?,
-        userAgent: String?
+        userAgent: String?,
+        referer: String? = null
     ) {
         val existingBytes = if (file.exists()) file.length() else 0
         
@@ -209,6 +250,12 @@ class DownloadService : Service() {
         
         // Add cookies if available
         cookies?.let { requestBuilder.header("Cookie", it) }
+        
+        // Add Referer header so servers know which page triggered the download
+        referer?.takeIf { it.startsWith("http") }?.let {
+            requestBuilder.header("Referer", it)
+            Log.d(TAG, "Download with Referer: $it")
+        }
         
         // Resume support - request partial content
         if (existingBytes > 0) {
@@ -547,6 +594,8 @@ class DownloadService : Service() {
         val mimeType: String,
         val cookies: String?,
         val userAgent: String?,
+        val referer: String? = null,
+        val dirUri: String? = null,
         @Volatile var isPaused: Boolean = false
     )
 }

@@ -8,19 +8,22 @@ import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import com.nova.browser.data.local.datastore.SettingsDataStore
 import com.nova.browser.data.local.db.DownloadDao
 import com.nova.browser.data.local.db.DownloadEntity
 import com.nova.browser.service.DownloadService
 import com.nova.browser.worker.DownloadStatusWorker
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class DownloadRepository @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val downloadDao: DownloadDao
+    private val downloadDao: DownloadDao,
+    private val settingsDataStore: SettingsDataStore
 ) {
     companion object {
         private const val TAG = "DownloadRepository"
@@ -39,13 +42,15 @@ class DownloadRepository @Inject constructor(
     /**
      * Start a new download using the custom download service.
      * Supports pause/resume via OkHttp with HTTP Range headers.
+     * @param referer The page URL that triggered the download (used as HTTP Referer header).
      */
     suspend fun startDownload(
         url: String,
         fileName: String,
         mimeType: String,
         cookies: String? = null,
-        userAgent: String? = null
+        userAgent: String? = null,
+        referer: String? = null
     ): Long {
         // Generate unique ID
         val downloadId = System.currentTimeMillis()
@@ -64,6 +69,9 @@ class DownloadRepository @Inject constructor(
 
         downloadDao.insert(download)
 
+        // Read current download directory preference
+        val dirUri = settingsDataStore.settings.first().downloadDirUri
+
         // Start the download service
         val intent = Intent(context, DownloadService::class.java).apply {
             action = DownloadService.ACTION_START
@@ -73,6 +81,8 @@ class DownloadRepository @Inject constructor(
             putExtra(DownloadService.EXTRA_MIME_TYPE, mimeType)
             cookies?.let { putExtra(DownloadService.EXTRA_COOKIES, it) }
             userAgent?.let { putExtra(DownloadService.EXTRA_USER_AGENT, it) }
+            referer?.let { putExtra(DownloadService.EXTRA_REFERER, it) }
+            if (dirUri.isNotEmpty()) putExtra(DownloadService.EXTRA_DIR_URI, dirUri)
         }
 
         // Use startForegroundService on Android 8+
@@ -85,7 +95,7 @@ class DownloadRepository @Inject constructor(
         // Enqueue status monitoring worker as fallback
         enqueueStatusWorker(downloadId)
 
-        Log.d(TAG, "Started download $downloadId: $fileName (cookies=${cookies != null}, ua=${userAgent != null})")
+        Log.d(TAG, "Started download $downloadId: $fileName (referer=${referer != null}, dir=${dirUri.isNotEmpty()})")
         return downloadId
     }
 
@@ -171,21 +181,28 @@ class DownloadRepository @Inject constructor(
 
     /**
      * Enqueue a worker to monitor download status and ensure it doesn't get stuck.
+     * Note: DownloadService already handles status updates directly. This worker is
+     * only a fallback safety net for edge cases (app killed mid-download, etc.).
      */
     private fun enqueueStatusWorker(downloadId: Long) {
-        val workRequest = OneTimeWorkRequestBuilder<DownloadStatusWorker>()
-            .setInputData(
-                Data.Builder()
-                    .putLong(DownloadStatusWorker.KEY_DOWNLOAD_ID, downloadId)
-                    .build()
-            )
-            .addTag("download_$downloadId")
-            .build()
+        try {
+            val workRequest = OneTimeWorkRequestBuilder<DownloadStatusWorker>()
+                .setInputData(
+                    Data.Builder()
+                        .putLong(DownloadStatusWorker.KEY_DOWNLOAD_ID, downloadId)
+                        .build()
+                )
+                .addTag("download_$downloadId")
+                .build()
 
-        WorkManager.getInstance(context).enqueueUniqueWork(
-            "${DownloadStatusWorker.WORK_NAME}_$downloadId",
-            ExistingWorkPolicy.KEEP,
-            workRequest
-        )
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                "${DownloadStatusWorker.WORK_NAME}_$downloadId",
+                ExistingWorkPolicy.KEEP,
+                workRequest
+            )
+        } catch (e: Exception) {
+            // Worker is a fallback-only safety net. DownloadService handles the primary flow.
+            Log.w(TAG, "Could not enqueue DownloadStatusWorker (non-fatal): ${e.message}")
+        }
     }
 }

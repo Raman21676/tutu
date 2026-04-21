@@ -106,23 +106,25 @@ class AdBlocker private constructor() {
      */
     private fun extractDomain(url: String): String? {
         return try {
-            when {
+            val hostWithPort = when {
                 url.startsWith("http://") -> {
                     val start = 7
                     val end = url.indexOf("/", start).takeIf { it != -1 } ?: url.length
-                    url.substring(start, end).removePrefix("www.")
+                    url.substring(start, end)
                 }
                 url.startsWith("https://") -> {
                     val start = 8
                     val end = url.indexOf("/", start).takeIf { it != -1 } ?: url.length
-                    url.substring(start, end).removePrefix("www.")
+                    url.substring(start, end)
                 }
                 else -> {
-                    // No protocol, extract domain part
                     val end = url.indexOf("/").takeIf { it != -1 } ?: url.length
-                    url.substring(0, end).removePrefix("www.")
+                    url.substring(0, end)
                 }
             }
+            // Strip port number (e.g. ads.example.com:443 -> ads.example.com)
+            val host = hostWithPort.substringBefore(":")
+            host.removePrefix("www.").lowercase()
         } catch (e: Exception) {
             Log.e(TAG, "Error extracting domain from: $url", e)
             null
