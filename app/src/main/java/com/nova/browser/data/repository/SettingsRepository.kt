@@ -61,6 +61,10 @@ class SettingsRepository @Inject constructor(
         dataStore.updateDownloadDirectory(uri)
     }
 
+    suspend fun setDesktopMode(enabled: Boolean) {
+        dataStore.updateDesktopMode(enabled)
+    }
+
     suspend fun clearAll() {
         dataStore.clearAll()
     }

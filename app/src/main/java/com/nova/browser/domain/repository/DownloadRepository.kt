@@ -4,15 +4,10 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
-import androidx.work.Data
-import androidx.work.ExistingWorkPolicy
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
 import com.nova.browser.data.local.datastore.SettingsDataStore
 import com.nova.browser.data.local.db.DownloadDao
 import com.nova.browser.data.local.db.DownloadEntity
 import com.nova.browser.service.DownloadService
-import com.nova.browser.worker.DownloadStatusWorker
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -92,9 +87,7 @@ class DownloadRepository @Inject constructor(
             context.startService(intent)
         }
 
-        // Enqueue status monitoring worker as fallback
-        enqueueStatusWorker(downloadId)
-
+        // DownloadService handles all status updates directly — no Worker needed.
         Log.d(TAG, "Started download $downloadId: $fileName (referer=${referer != null}, dir=${dirUri.isNotEmpty()})")
         return downloadId
     }
@@ -179,30 +172,5 @@ class DownloadRepository @Inject constructor(
         downloadDao.updateFileName(id, fileName)
     }
 
-    /**
-     * Enqueue a worker to monitor download status and ensure it doesn't get stuck.
-     * Note: DownloadService already handles status updates directly. This worker is
-     * only a fallback safety net for edge cases (app killed mid-download, etc.).
-     */
-    private fun enqueueStatusWorker(downloadId: Long) {
-        try {
-            val workRequest = OneTimeWorkRequestBuilder<DownloadStatusWorker>()
-                .setInputData(
-                    Data.Builder()
-                        .putLong(DownloadStatusWorker.KEY_DOWNLOAD_ID, downloadId)
-                        .build()
-                )
-                .addTag("download_$downloadId")
-                .build()
-
-            WorkManager.getInstance(context).enqueueUniqueWork(
-                "${DownloadStatusWorker.WORK_NAME}_$downloadId",
-                ExistingWorkPolicy.KEEP,
-                workRequest
-            )
-        } catch (e: Exception) {
-            // Worker is a fallback-only safety net. DownloadService handles the primary flow.
-            Log.w(TAG, "Could not enqueue DownloadStatusWorker (non-fatal): ${e.message}")
-        }
-    }
 }
+

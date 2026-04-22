@@ -65,6 +65,7 @@ import com.nova.browser.ui.components.LinearProgressIndicatorCustom
 import com.nova.browser.ui.theme.CoralRed
 import com.nova.browser.ui.viewmodel.WebViewModel
 import com.nova.browser.util.AdBlocker
+import com.nova.browser.util.AdBlockCosmeticInjector
 
 /**
  * Incognito Web Screen - Private browsing mode.
@@ -87,6 +88,7 @@ fun IncognitoWebScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val adBlockEnabled by viewModel.adBlockEnabled.collectAsState()
+    val blockedCount by viewModel.blockedCount.collectAsState()
     
     // Get AdBlocker instance
     val adBlocker = remember { AdBlocker.getInstance() }
@@ -257,12 +259,15 @@ fun IncognitoWebScreen(
                             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                                 Log.d(TAG, "Incognito page started: $url")
                                 url?.let { viewModel.onPageStarted(it) }
+                                viewModel.resetBlockedCount()
                             }
                             
                             override fun onPageFinished(view: WebView, url: String) {
                                 Log.d(TAG, "Incognito page finished: $url")
                                 viewModel.onPageFinished(url)
                                 viewModel.updateNavigationState(view.canGoBack(), view.canGoForward())
+                                // Cosmetic ad filter (safe — no download interceptor needed in incognito)
+                                if (adBlockEnabled) AdBlockCosmeticInjector.inject(view)
                             }
                             
                             override fun shouldInterceptRequest(
@@ -273,6 +278,7 @@ fun IncognitoWebScreen(
                                 if (adBlockEnabled && request?.url != null) {
                                     val url = request.url.toString()
                                     if (adBlocker.shouldBlock(url)) {
+                                        viewModel.incrementBlockedCount()
                                         return android.webkit.WebResourceResponse(
                                             "text/plain",
                                             "UTF-8",

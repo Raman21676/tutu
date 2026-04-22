@@ -20,6 +20,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.RotateRight
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Computer
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.Info
@@ -139,6 +140,13 @@ fun SettingsScreen(
                 onCheckedChange = { viewModel.setAutoRotate(it) },
                 title = stringResource(R.string.toggle_auto_rotate),
                 icon = Icons.AutoMirrored.Filled.RotateRight
+            )
+
+            ToggleSwitch(
+                checked = settings.desktopMode,
+                onCheckedChange = { viewModel.setDesktopMode(it) },
+                title = "Desktop Mode",
+                icon = Icons.Default.Computer
             )
             
             ToggleSwitch(

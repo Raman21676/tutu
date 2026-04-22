@@ -84,6 +84,7 @@ import com.nova.browser.domain.repository.DownloadRepository
 import com.nova.browser.util.DarkModeInjector
 import com.nova.browser.util.ReadingModeInjector
 import com.nova.browser.util.AdBlocker
+import com.nova.browser.util.AdBlockCosmeticInjector
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -102,6 +103,8 @@ fun WebScreen(
     val state by viewModel.state.collectAsState()
     val fullscreen by viewModel.fullscreen.collectAsState()
     val adBlockEnabled by viewModel.adBlockEnabled.collectAsState()
+    val blockedCount by viewModel.blockedCount.collectAsState()
+    val desktopMode by viewModel.desktopMode.collectAsState()
     
     // Get AdBlocker instance
     val adBlocker = remember { AdBlocker.getInstance() }
@@ -125,6 +128,8 @@ fun WebScreen(
     // Feature states
     var isReadingMode by remember { mutableStateOf(false) }
     var showQrDialog by remember { mutableStateOf(false) }
+    var showFindBar by remember { mutableStateOf(false) }
+    var findQuery by remember { mutableStateOf("") }
     
     val context = androidx.compose.ui.platform.LocalContext.current
     val activity = context as Activity
@@ -320,7 +325,47 @@ fun WebScreen(
                                     )
                                 }
                             }
-                            
+
+                            // Ad Block shield — shows live blocked-request count for this page
+                            if (adBlockEnabled) {
+                                Box(contentAlignment = Alignment.TopEnd) {
+                                    IconButton(onClick = {
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            if (blockedCount > 0) "$blockedCount ads blocked on this page" else "Ad blocking active",
+                                            android.widget.Toast.LENGTH_SHORT
+                                        ).show()
+                                    }) {
+                                        Icon(
+                                            imageVector = Icons.Default.Shield,
+                                            contentDescription = "Ad blocking active",
+                                            tint = if (blockedCount > 0)
+                                                androidx.compose.ui.graphics.Color(0xFF4CAF50)
+                                            else
+                                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+                                        )
+                                    }
+                                    if (blockedCount > 0) {
+                                        Surface(
+                                            modifier = Modifier
+                                                .size(16.dp)
+                                                .align(Alignment.TopEnd)
+                                                .padding(end = 6.dp, top = 4.dp),
+                                            shape = CircleShape,
+                                            color = androidx.compose.ui.graphics.Color(0xFF4CAF50)
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Text(
+                                                    text = if (blockedCount > 99) "99" else blockedCount.toString(),
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = Color.White
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
                             // History button
                             IconButton(onClick = onNavigateToHistory) {
                                 Icon(
@@ -357,6 +402,38 @@ fun WebScreen(
                                     contentDescription = "Bookmark"
                                 )
                             }
+
+                            // Share current page via Android share sheet
+                            IconButton(onClick = {
+                                if (state.url.isNotBlank()) {
+                                    val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(android.content.Intent.EXTRA_TEXT, state.url)
+                                        putExtra(android.content.Intent.EXTRA_SUBJECT, state.title.ifBlank { state.url })
+                                    }
+                                    context.startActivity(android.content.Intent.createChooser(shareIntent, "Share via"))
+                                }
+                            }) {
+                                Icon(
+                                    imageVector = Icons.Default.Share,
+                                    contentDescription = "Share page"
+                                )
+                            }
+
+                            // Find in Page toggle
+                            IconButton(onClick = {
+                                showFindBar = !showFindBar
+                                if (!showFindBar) {
+                                    webView?.clearMatches()
+                                    findQuery = ""
+                                }
+                            }) {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = "Find in page",
+                                    tint = if (showFindBar) CoralRed else MaterialTheme.colorScheme.onSurface
+                                )
+                            }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(
                             containerColor = MaterialTheme.colorScheme.background
@@ -375,6 +452,44 @@ fun WebScreen(
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
+                    }
+
+                    // Find-in-Page bar
+                    if (showFindBar) {
+                        androidx.compose.material3.OutlinedTextField(
+                            value = findQuery,
+                            onValueChange = { q ->
+                                findQuery = q
+                                if (q.isNotBlank()) webView?.findAllAsync(q)
+                                else webView?.clearMatches()
+                            },
+                            placeholder = { Text("Find in page...") },
+                            singleLine = true,
+                            leadingIcon = {
+                                Icon(Icons.Default.Search, contentDescription = null)
+                            },
+                            trailingIcon = {
+                                Row {
+                                    IconButton(onClick = { webView?.findNext(false) }) {
+                                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Previous")
+                                    }
+                                    IconButton(onClick = { webView?.findNext(true) }) {
+                                        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Next")
+                                    }
+                                    IconButton(onClick = {
+                                        showFindBar = false
+                                        findQuery = ""
+                                        webView?.clearMatches()
+                                    }) {
+                                        Icon(Icons.Default.Close, contentDescription = "Close")
+                                    }
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            shape = MaterialTheme.shapes.large
+                        )
                     }
                 }
             }
@@ -592,8 +707,9 @@ fun WebScreen(
                                 url?.let { 
                                     viewModel.onPageStarted(it)
                                 }
-                                // Reset reading mode on navigation
+                                // Reset reading mode and blocked counter on each new page
                                 isReadingMode = false
+                                viewModel.resetBlockedCount()
                                 
                                 // CRITICAL: Zero JS injection for TikTok!
                                 // User's Attempt 3 proved: no JS injection = feed works beyond 2 reels
@@ -616,9 +732,10 @@ fun WebScreen(
                                 view.requestLayout()
                                 view.post { view.invalidate() }
                                 
-                                // Inject download interceptor JS (safe for non-TikTok sites)
+                                // Inject download interceptor + cosmetic ad filter (safe for non-TikTok)
                                 if (!url.contains("tiktok")) {
                                     injectDownloadInterceptor(view)
+                                    AdBlockCosmeticInjector.inject(view)
                                 }
                             }
                             
@@ -635,6 +752,8 @@ fun WebScreen(
                                 if (adBlockEnabled && request?.url != null) {
                                     val url = request.url.toString()
                                     if (adBlocker.shouldBlock(url)) {
+                                        // Increment badge counter (thread-safe — called from IO thread)
+                                        viewModel.incrementBlockedCount()
                                         // Return empty response for blocked ads/trackers
                                         return android.webkit.WebResourceResponse(
                                             "text/plain",
@@ -791,8 +910,18 @@ fun WebScreen(
                 modifier = Modifier.fillMaxSize(),
                 update = { wv ->
                     webView = wv
-                    // Don't reload - WebView manages its own navigation.
-                    // SPA changes are handled via doUpdateVisitedHistory.
+                    // Apply desktop/mobile UA switch reactively when the setting changes
+                    val desktopUA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+                    val currentUA = wv.settings.userAgentString ?: ""
+                    if (desktopMode && !currentUA.contains("X11; Linux x86_64")) {
+                        wv.settings.userAgentString = desktopUA
+                        wv.reload()
+                    } else if (!desktopMode && currentUA.contains("X11; Linux x86_64")) {
+                        // Restore cleaned mobile UA
+                        val defaultUA = android.webkit.WebSettings.getDefaultUserAgent(wv.context)
+                        wv.settings.userAgentString = defaultUA.replace("; wv", "").replace("Version/4.0 ", "")
+                        wv.reload()
+                    }
                 }
             )
             

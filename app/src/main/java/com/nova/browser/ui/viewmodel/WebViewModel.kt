@@ -34,12 +34,19 @@ class WebViewModel(
     
     private val _adBlockEnabled = MutableStateFlow(true)
     val adBlockEnabled: StateFlow<Boolean> = _adBlockEnabled.asStateFlow()
+
+    private val _desktopMode = MutableStateFlow(false)
+    val desktopMode: StateFlow<Boolean> = _desktopMode.asStateFlow()
+
+    private val _blockedCount = MutableStateFlow(0)
+    val blockedCount: StateFlow<Int> = _blockedCount.asStateFlow()
     
     init {
         viewModelScope.launch {
             settingsRepository.settings.collect { settings ->
                 _fullscreen.value = settings.fullscreen
                 _adBlockEnabled.value = settings.adBlockEnabled
+                _desktopMode.value = settings.desktopMode
             }
         }
     }
@@ -97,6 +104,14 @@ class WebViewModel(
     
     fun clearError() {
         _state.value = _state.value.copy(error = null)
+    }
+
+    fun incrementBlockedCount() {
+        _blockedCount.value = _blockedCount.value + 1
+    }
+
+    fun resetBlockedCount() {
+        _blockedCount.value = 0
     }
     
     fun loadUrl(url: String) {

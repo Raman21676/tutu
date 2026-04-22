@@ -44,6 +44,7 @@ class SettingsDataStore(private val context: Context) {
         val SEARCH_ENGINE = stringPreferencesKey("search_engine")
         val AD_BLOCK_ENABLED = booleanPreferencesKey("ad_block_enabled")
         val DOWNLOAD_DIR_URI = stringPreferencesKey("download_dir_uri")
+        val DESKTOP_MODE = booleanPreferencesKey("desktop_mode")
     }
     
     val settings: Flow<TutuSettings> = context.dataStore.data
@@ -74,7 +75,8 @@ class SettingsDataStore(private val context: Context) {
                     isFirstLaunch = prefs[FIRST_LAUNCH] ?: true,
                     searchEngine = prefs[SEARCH_ENGINE] ?: "GOOGLE",
                     adBlockEnabled = prefs[AD_BLOCK_ENABLED] ?: true,
-                    downloadDirUri = prefs[DOWNLOAD_DIR_URI] ?: ""
+                    downloadDirUri = prefs[DOWNLOAD_DIR_URI] ?: "",
+                    desktopMode = prefs[DESKTOP_MODE] ?: false
                 )
             } catch (e: Exception) {
                 Log.e(TAG, "Error creating settings", e)
@@ -224,6 +226,16 @@ class SettingsDataStore(private val context: Context) {
         }
     }
 
+    suspend fun updateDesktopMode(enabled: Boolean) {
+        try {
+            context.dataStore.edit { prefs ->
+                prefs[DESKTOP_MODE] = enabled
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error saving desktop mode setting", e)
+        }
+    }
+
     suspend fun clearAll() {
         try {
             context.dataStore.edit { prefs ->
@@ -248,5 +260,6 @@ data class TutuSettings(
     val isFirstLaunch: Boolean = true,
     val searchEngine: String = "GOOGLE",
     val adBlockEnabled: Boolean = true,
-    val downloadDirUri: String = ""
+    val downloadDirUri: String = "",
+    val desktopMode: Boolean = false
 )

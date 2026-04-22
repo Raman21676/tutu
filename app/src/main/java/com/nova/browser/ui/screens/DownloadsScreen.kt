@@ -496,6 +496,29 @@ private fun DownloadItemCard(
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
+                // Linear progress bar
+                Spacer(modifier = Modifier.height(4.dp))
+                if (item.totalBytes > 0) {
+                    androidx.compose.material3.LinearProgressIndicator(
+                        progress = { (item.downloadedBytes.toFloat() / item.totalBytes.toFloat()).coerceIn(0f, 1f) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(3.dp)
+                            .clip(MaterialTheme.shapes.small),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                } else {
+                    // Indeterminate bar when total size unknown
+                    androidx.compose.material3.LinearProgressIndicator(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(3.dp)
+                            .clip(MaterialTheme.shapes.small),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                }
             }
         }
     }

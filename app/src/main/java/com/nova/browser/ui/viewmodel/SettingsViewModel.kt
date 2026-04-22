@@ -83,6 +83,12 @@ class SettingsViewModel(
             settingsRepository.setDownloadDirectory(uri)
         }
     }
+
+    fun setDesktopMode(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setDesktopMode(enabled)
+        }
+    }
     
     class Factory(
         private val settingsRepository: SettingsRepository,

@@ -7,20 +7,50 @@ import kotlinx.coroutines.withContext
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * AdBlocker engine that blocks requests to known ad and tracker domains.
- * Loads blocklist from assets and checks URLs against it.
+ * AdBlocker engine — two-layer blocking:
+ *  1. Domain-based: 87,770 domains from Steven Black unified hosts file.
+ *  2. URL keyword/pattern matching: covers ad networks not caught by domain alone.
+ *
+ * Also tracks a per-page blocked-request counter for the shield badge UI.
  */
 class AdBlocker private constructor() {
 
     companion object {
         private const val TAG = "AdBlocker"
         private const val BLOCKLIST_FILE = "adblock_domains.txt"
-        
+
+        /**
+         * URL substring patterns for ad/tracker networks.
+         * Catches requests that use unpredictable subdomains or paths
+         * not covered by the static domain list.
+         */
+        private val AD_URL_KEYWORDS = listOf(
+            // Google advertising
+            "googlesyndication.com", "doubleclick.net", "googleadservices.com",
+            "pagead/js", "pagead2.googlesyndication", "adservice.google",
+            // Facebook pixel & ads
+            "facebook.com/tr", "connect.facebook.net/en_US/fbevents",
+            // Analytics / tracking
+            "google-analytics.com/collect", "google-analytics.com/j/collect",
+            "analytics.js", "gtag/js", "gtm.js",
+            "hotjar.com", "fullstory.com", "mouseflow.com",
+            "clarity.ms", "quantserve.com", "scorecardresearch.com",
+            "omtrdc.net", "demdex.net",
+            // Ad exchanges
+            "2mdn.net", "adnxs.com", "moatads.com",
+            "criteo.com", "taboola.com", "outbrain.com",
+            "amazon-adsystem.com", "media.net",
+            // Misc tracking beacons
+            "bat.bing.com", "sc-static.net/scevent",
+            "/beacon?", "/pixel?", "/collect?"
+        )
+
         @Volatile
         private var instance: AdBlocker? = null
-        
+
         fun getInstance(): AdBlocker {
             return instance ?: synchronized(this) {
                 instance ?: AdBlocker().also { instance = it }
@@ -28,17 +58,13 @@ class AdBlocker private constructor() {
         }
     }
 
-    // Using ConcurrentHashMap for thread-safe access
     private val blockedDomains = ConcurrentHashMap.newKeySet<String>()
+    private val _blockedCount = AtomicInteger(0)
     private var isInitialized = false
 
-    /**
-     * Initialize the ad blocker by loading the blocklist from assets.
-     * Should be called once on app startup.
-     */
+    /** Initialize the ad blocker by loading the blocklist from assets. Call once on app startup. */
     suspend fun initialize(context: Context) {
         if (isInitialized) return
-        
         withContext(Dispatchers.IO) {
             try {
                 val startTime = System.currentTimeMillis()
@@ -47,9 +73,8 @@ class AdBlocker private constructor() {
                         var line: String?
                         var count = 0
                         while (reader.readLine().also { line = it } != null) {
-                            line?.let { 
+                            line?.let {
                                 val domain = it.trim().lowercase()
-                                // Skip empty lines and comments
                                 if (domain.isNotEmpty() && !domain.startsWith("#")) {
                                     blockedDomains.add(domain)
                                     count++
@@ -69,41 +94,56 @@ class AdBlocker private constructor() {
 
     /**
      * Check if a URL should be blocked.
-     * @param url The URL to check
-     * @return true if the URL should be blocked, false otherwise
+     * Layer 1: exact/parent domain match.
+     * Layer 2: URL keyword pattern match.
      */
     fun shouldBlock(url: String): Boolean {
-        if (!isInitialized || blockedDomains.isEmpty()) {
-            return false
-        }
+        if (!isInitialized || blockedDomains.isEmpty()) return false
 
         val domain = extractDomain(url)?.lowercase() ?: return false
-        
-        // Check exact match
+
+        // Layer 1a — exact domain match
         if (blockedDomains.contains(domain)) {
-            Log.d(TAG, "Blocked (exact): $url")
+            _blockedCount.incrementAndGet()
+            Log.d(TAG, "Blocked (exact domain): $domain")
             return true
         }
-        
-        // Check if domain or any parent domain is in blocklist
+
+        // Layer 1b — parent domain match (subdomain walk)
         var currentDomain = domain
         while (currentDomain.contains(".")) {
             if (blockedDomains.contains(currentDomain)) {
-                Log.d(TAG, "Blocked (domain): $url")
+                _blockedCount.incrementAndGet()
+                Log.d(TAG, "Blocked (parent domain): $currentDomain")
                 return true
             }
-            // Move to parent domain
             val dotIndex = currentDomain.indexOf(".")
             if (dotIndex == -1) break
             currentDomain = currentDomain.substring(dotIndex + 1)
         }
-        
+
+        // Layer 2 — URL keyword/pattern match
+        val lowerUrl = url.lowercase()
+        for (keyword in AD_URL_KEYWORDS) {
+            if (lowerUrl.contains(keyword)) {
+                _blockedCount.incrementAndGet()
+                Log.d(TAG, "Blocked (keyword '$keyword'): $url")
+                return true
+            }
+        }
+
         return false
     }
 
-    /**
-     * Extract domain from a URL.
-     */
+    /** Returns current blocked count (for the current page). */
+    fun getBlockedCount(): Int = _blockedCount.get()
+
+    /** Resets the blocked count — call on each new page load. */
+    fun resetBlockedCount() {
+        _blockedCount.set(0)
+    }
+
+    /** Extract domain from a URL, stripping port and www prefix. */
     private fun extractDomain(url: String): String? {
         return try {
             val hostWithPort = when {
@@ -131,19 +171,8 @@ class AdBlocker private constructor() {
         }
     }
 
-    /**
-     * Get the number of blocked domains loaded.
-     */
     fun getBlockedDomainCount(): Int = blockedDomains.size
-
-    /**
-     * Check if the blocker is initialized and ready.
-     */
     fun isReady(): Boolean = isInitialized
-
-    /**
-     * Clear all blocked domains (useful for testing or reloading).
-     */
     fun clear() {
         blockedDomains.clear()
         isInitialized = false
