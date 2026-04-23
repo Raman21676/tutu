@@ -1,5 +1,6 @@
 package com.nova.browser.ui.screens
 
+import android.app.DownloadManager
 import android.content.ActivityNotFoundException
 import android.content.ClipboardManager
 import android.content.Context
@@ -688,22 +689,34 @@ private fun openFileLocation(context: Context, item: DownloadEntity) {
             Log.d("DownloadsScreen", "AOSP DocumentsUI failed: ${e.message}")
         }
 
-        // ── Strategy 4: Generic file:// VIEW intent (works on some OEM file managers) ──
+        // ── Strategy 4: file:// with Uri.fromFile() — properly encodes spaces ──
         try {
             val intent = Intent(Intent.ACTION_VIEW).apply {
-                data = Uri.parse("file://${parentDir.absolutePath}")
+                setDataAndType(Uri.fromFile(parentDir), "resource/folder")
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             if (intent.resolveActivity(context.packageManager) != null) {
                 context.startActivity(intent)
-                Log.d("DownloadsScreen", "Opened folder via file:// VIEW")
+                Log.d("DownloadsScreen", "Opened folder via file:// VIEW (Uri.fromFile)")
                 return
             }
         } catch (e: Exception) {
             Log.d("DownloadsScreen", "file:// VIEW failed: ${e.message}")
         }
 
-        // ── Strategy 5: Open the file directly so user can "show in folder" from viewer ──
+        // ── Strategy 5: System Downloads app ──
+        try {
+            val intent = Intent(DownloadManager.ACTION_VIEW_DOWNLOADS).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            Log.d("DownloadsScreen", "Opened system Downloads app")
+            return
+        } catch (e: Exception) {
+            Log.d("DownloadsScreen", "System Downloads app failed: ${e.message}")
+        }
+
+        // ── Strategy 6: Open the file directly so user can "show in folder" from viewer ──
         try {
             val mimeType = item.mimeType.takeIf { it.isNotEmpty() }
                 ?: getMimeTypeFromFileName(file.name)

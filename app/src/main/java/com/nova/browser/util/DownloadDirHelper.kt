@@ -2,14 +2,9 @@ package com.nova.browser.util
 
 import android.content.Context
 import android.net.Uri
-import android.os.Build
 import android.os.Environment
 import android.provider.DocumentsContract
 import android.util.Log
-import androidx.datastore.preferences.core.stringPreferencesKey
-import com.nova.browser.data.local.datastore.SettingsDataStore
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
 import java.io.File
 
 /**
@@ -17,50 +12,80 @@ import java.io.File
  *
  * Inspired by RustPDF's OutputDirHelper.
  *
- * Default location (all Android versions):
+ * Uses SharedPreferences for synchronous reads (avoiding runBlocking on the
+ * main thread).  Default location:
  *   /storage/emulated/0/Download/Nova Downloads
  *
- * The user may override this via Settings → Downloads (SAF folder picker).
- * When a custom SAF URI is set we try to convert it back to a real File path
- * so that the folder can be opened in a file manager later.
+ * The user may override this via Settings → Downloads.
  */
 object DownloadDirHelper {
 
     const val DEFAULT_FOLDER_NAME = "Nova Downloads"
     private const val TAG = "DownloadDirHelper"
+    private const val PREFS_NAME = "nova_download_prefs"
+    private const val KEY_DIR_PATH = "download_dir_path"
+    private const val KEY_CUSTOM_URI = "download_dir_uri" // legacy SAF URI fallback
 
     /**
      * Return the absolute File path of the current download directory.
      * Creates the directory if it does not yet exist.
+     *
+     * Reads from SharedPreferences synchronously — safe to call on the main thread.
      */
     fun getDownloadDir(context: Context): File {
-        val customUri = runBlocking {
-            try {
-                SettingsDataStore(context).settings.first().downloadDirUri
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to read downloadDirUri setting", e)
-                ""
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+        // 1. Try the explicit saved path first (new system)
+        val savedPath = prefs.getString(KEY_DIR_PATH, null)
+        if (!savedPath.isNullOrEmpty()) {
+            val dir = File(savedPath)
+            if (dir.exists() || dir.mkdirs()) {
+                Log.d(TAG, "Using custom download dir: ${dir.absolutePath}")
+                return dir
             }
         }
 
-        if (customUri.isNotEmpty()) {
-            val path = convertSafUriToPath(customUri)
+        // 2. Try legacy SAF URI (old system, converts to path)
+        val legacyUri = prefs.getString(KEY_CUSTOM_URI, null)
+        if (!legacyUri.isNullOrEmpty()) {
+            val path = convertSafUriToPath(legacyUri)
             if (path != null) {
                 val dir = File(path)
                 if (dir.exists() || dir.mkdirs()) {
-                    Log.d(TAG, "Using custom download dir: ${dir.absolutePath}")
+                    Log.d(TAG, "Using legacy SAF dir: ${dir.absolutePath}")
                     return dir
                 }
             }
         }
 
-        // Default fallback: public Downloads / Nova Downloads
+        // 3. Default fallback: public Downloads / Nova Downloads
         val publicDownloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
         val novaDir = File(publicDownloads, DEFAULT_FOLDER_NAME)
         if (!novaDir.exists()) {
             novaDir.mkdirs()
         }
         return novaDir
+    }
+
+    /**
+     * Save the custom directory path to SharedPreferences.
+     */
+    fun setDownloadDir(context: Context, path: String) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_DIR_PATH, path)
+            .apply()
+    }
+
+    /**
+     * Reset to default (clear custom path and legacy URI).
+     */
+    fun resetToDefault(context: Context) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .remove(KEY_DIR_PATH)
+            .remove(KEY_CUSTOM_URI)
+            .apply()
     }
 
     /**
@@ -111,12 +136,5 @@ object DownloadDirHelper {
      */
     fun getDisplayPath(context: Context): String {
         return getDownloadDir(context).absolutePath
-    }
-
-    /**
-     * Reset the custom directory back to default.
-     */
-    suspend fun resetToDefault(context: Context) {
-        SettingsDataStore(context).updateDownloadDirectory("")
     }
 }

@@ -1,6 +1,11 @@
 package com.nova.browser
 
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -54,6 +59,33 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         private const val TAG = "MainActivity"
+        private const val PREFS_PERMISSION = "nova_permission_prefs"
+        private const val KEY_MANAGE_STORAGE_SHOWN = "manage_storage_shown"
+    }
+
+    /**
+     * On Android 11+ (API 30+), redirect the user to system settings to grant
+     * "All Files Access" permission. This is required for writing to arbitrary
+     * public directories like /sdcard/Download/Nova Downloads/.
+     */
+    private fun requestAllFilesAccessIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (!Environment.isExternalStorageManager()) {
+                val prefs = getSharedPreferences(PREFS_PERMISSION, MODE_PRIVATE)
+                val alreadyShown = prefs.getBoolean(KEY_MANAGE_STORAGE_SHOWN, false)
+                if (!alreadyShown) {
+                    prefs.edit().putBoolean(KEY_MANAGE_STORAGE_SHOWN, true).apply()
+                    try {
+                        val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                            data = Uri.parse("package:$packageName")
+                        }
+                        startActivity(intent)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Could not open MANAGE_EXTERNAL_STORAGE settings", e)
+                    }
+                }
+            }
+        }
     }
 
     @Inject
@@ -73,6 +105,9 @@ class MainActivity : ComponentActivity() {
         // Initialize repositories
         settingsRepository = AppModule.provideSettingsRepository(this)
         bookmarkRepository = AppModule.provideBookmarkRepository(this)
+
+        // Request MANAGE_EXTERNAL_STORAGE on Android 11+ if not already granted
+        requestAllFilesAccessIfNeeded()
 
         // Get URL from intent (if opened via external link)
         val intentUrl = intent?.data?.toString()
