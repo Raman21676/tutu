@@ -21,6 +21,7 @@ import com.nova.browser.MainActivity
 import com.nova.browser.R
 import com.nova.browser.data.local.db.DownloadEntity
 import com.nova.browser.domain.repository.DownloadRepository
+import com.nova.browser.util.DownloadDirHelper
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -121,45 +122,21 @@ class DownloadService : Service() {
      * If a SAF tree URI is provided (user-chosen folder), convert it to a File path.
      * Falls back to public Downloads/Nova Downloads/ on any failure.
      */
-    private fun getDownloadDir(dirUri: String? = null): File {
-        if (!dirUri.isNullOrEmpty()) {
-            val path = convertSAFUriToPath(dirUri)
-            if (path != null) {
-                val dir = File(path)
-                if (dir.exists() || dir.mkdirs()) {
-                    Log.d(TAG, "Using custom download dir: ${dir.absolutePath}")
-                    return dir
-                }
-            }
-        }
-        val publicDownloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-        val novaDir = File(publicDownloads, DOWNLOAD_FOLDER_NAME)
-        if (!novaDir.exists()) {
-            novaDir.mkdirs()
-        }
-        return novaDir
-    }
-
     /**
-     * Convert a SAF tree URI (content://com.android.externalstorage.documents/tree/primary%3A...)
-     * to an absolute File path for primary (internal) storage.
-     * Returns null for external SD cards or unknown authorities.
+     * Get download directory using DownloadDirHelper which respects user settings.
+     * The dirUri parameter is kept for API compatibility but is superseded by
+     * the helper which reads from SettingsDataStore.
      */
-    private fun convertSAFUriToPath(uriString: String): String? {
-        return try {
-            val uri = Uri.parse(uriString)
-            if (uri.authority == "com.android.externalstorage.documents") {
-                val docId = DocumentsContract.getTreeDocumentId(uri)
-                val split = docId.split(":")
-                if (split.size >= 2 && split[0] == "primary") {
-                    val relativePath = split[1]
-                    "/storage/emulated/0/$relativePath"
-                } else null
-            } else null
-        } catch (e: Exception) {
-            Log.w(TAG, "Could not convert SAF URI to path: $uriString", e)
-            null
+    private fun getDownloadDir(dirUri: String? = null): File {
+        val dir = DownloadDirHelper.getDownloadDir(applicationContext)
+        if (dir.exists() || dir.mkdirs()) {
+            Log.d(TAG, "Using download dir: ${dir.absolutePath}")
+            return dir
         }
+        // Final fallback — should rarely be needed since helper already falls back
+        val fallback = applicationContext.getExternalFilesDir(null) ?: applicationContext.filesDir
+        Log.w(TAG, "Download dir not usable, falling back to: ${fallback.absolutePath}")
+        return fallback
     }
 
     /**

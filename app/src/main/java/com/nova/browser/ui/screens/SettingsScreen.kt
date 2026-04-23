@@ -55,6 +55,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.nova.browser.BuildConfig
@@ -64,6 +65,7 @@ import com.nova.browser.ui.components.ToggleSwitch
 import com.nova.browser.ui.theme.CoralRed
 import com.nova.browser.ui.theme.TutuTheme
 import com.nova.browser.ui.viewmodel.SettingsViewModel
+import com.nova.browser.util.DownloadDirHelper
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -257,12 +259,11 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodyLarge
                     )
                     Text(
-                        text = if (settings.downloadDirUri.isEmpty()) 
-                            "Nova Downloads (Default)" 
-                        else 
-                            getFolderDisplayName(settings.downloadDirUri),
+                        text = DownloadDirHelper.getDisplayPath(context),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
                 // Reset-to-default button (shown only when custom dir is set)

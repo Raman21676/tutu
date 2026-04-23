@@ -31,6 +31,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.nova.browser.data.local.db.DownloadEntity
 import com.nova.browser.ui.theme.CoralRed
 import com.nova.browser.ui.viewmodel.DownloadsViewModel
+import com.nova.browser.util.DownloadDirHelper
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
@@ -602,20 +603,21 @@ private fun openDownloadedFile(context: Context, item: DownloadEntity) {
 }
 
 /**
- * Open the file manager at the download location
+ * Open the file manager at the download location.
+ *
+ * Tries multiple strategies (most reliable first) and falls back
+ * to opening the file directly or copying the path to clipboard.
  */
 private fun openFileLocation(context: Context, item: DownloadEntity) {
     Log.d("DownloadsScreen", "=== openFileLocation clicked for: ${item.fileName}, path: ${item.filePath}")
-    
+
     try {
-        // Get the Nova Downloads folder
-        val novaDownloadsDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Nova Downloads")
-        
-        // Get the actual file
+        // Determine the actual file and its parent folder
         val file = when {
             item.filePath.isNotEmpty() -> File(item.filePath)
             else -> {
-                val novaFile = File(novaDownloadsDir, item.fileName)
+                val novaDir = DownloadDirHelper.getDownloadDir(context)
+                val novaFile = File(novaDir, item.fileName)
                 if (novaFile.exists()) novaFile
                 else File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), item.fileName)
             }
@@ -626,132 +628,110 @@ private fun openFileLocation(context: Context, item: DownloadEntity) {
             return
         }
 
-        val parentDir = file.parentFile ?: novaDownloadsDir
+        val parentDir = file.parentFile ?: DownloadDirHelper.getDownloadDir(context)
         Log.d("DownloadsScreen", "Opening folder: ${parentDir.absolutePath}")
         Toast.makeText(context, "Opening folder...", Toast.LENGTH_SHORT).show()
 
-        // Approach 1: Open with DocumentsUI (Storage Access Framework) - shows the folder
+        // ── Strategy 1: DocumentsUI with exact path derived from file location ──
         try {
-            // Build the content URI for the Downloads/Nova Downloads folder
-            val uri = Uri.parse("content://com.android.externalstorage.documents/document/primary:Download/Nova%20Downloads")
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, "vnd.android.document/directory")
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                setPackage("com.google.android.documentsui")
-            }
-            if (intent.resolveActivity(context.packageManager) != null) {
-                context.startActivity(intent)
-                Log.d("DownloadsScreen", "Opened Nova Downloads folder with DocumentsUI")
-                return
-            }
-        } catch (e: Exception) {
-            Log.d("DownloadsScreen", "DocumentsUI directory failed: ${e.message}")
-        }
-
-        // Approach 2: Try DocumentsUI without specific package (let system choose)
-        try {
-            val uri = Uri.parse("content://com.android.externalstorage.documents/document/primary:Download/Nova%20Downloads")
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, "vnd.android.document/directory")
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            if (intent.resolveActivity(context.packageManager) != null) {
-                context.startActivity(intent)
-                Log.d("DownloadsScreen", "Opened Nova Downloads folder")
-                return
-            }
-        } catch (e: Exception) {
-            Log.d("DownloadsScreen", "Directory intent failed: ${e.message}")
-        }
-
-        // Approach 3: Try to open the parent Downloads folder
-        try {
-            val uri = Uri.parse("content://com.android.externalstorage.documents/document/primary:Download")
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, "vnd.android.document/directory")
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            if (intent.resolveActivity(context.packageManager) != null) {
-                context.startActivity(intent)
-                Log.d("DownloadsScreen", "Opened Downloads folder")
-                return
-            }
-        } catch (e: Exception) {
-            Log.d("DownloadsScreen", "Downloads folder failed: ${e.message}")
-        }
-
-        // Approach 4: Try OPPO/ColorOS file manager with Main activity
-        try {
-            val intent = Intent(Intent.ACTION_MAIN).apply {
-                component = android.content.ComponentName("com.coloros.filemanager", "com.coloros.filemanager.Main")
-                putExtra("path", parentDir.absolutePath)
-                putExtra("folder", parentDir.absolutePath)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            if (intent.resolveActivity(context.packageManager) != null) {
-                context.startActivity(intent)
-                Log.d("DownloadsScreen", "Opened ColorOS file manager")
-                return
-            }
-        } catch (e: Exception) {
-            Log.d("DownloadsScreen", "ColorOS Main failed: ${e.message}")
-        }
-
-        // Approach 5: Try OPPO file manager with VIEW action
-        try {
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                component = android.content.ComponentName("com.coloros.filemanager", "com.coloros.filemanager.Main")
-                setDataAndType(Uri.parse("file://${parentDir.absolutePath}"), "resource/folder")
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            if (intent.resolveActivity(context.packageManager) != null) {
-                context.startActivity(intent)
-                Log.d("DownloadsScreen", "Opened ColorOS file manager with VIEW")
-                return
-            }
-        } catch (e: Exception) {
-            Log.d("DownloadsScreen", "ColorOS VIEW failed: ${e.message}")
-        }
-
-        // Approach 6: Try to launch file manager and navigate to folder
-        try {
-            val intent = context.packageManager.getLaunchIntentForPackage("com.coloros.filemanager")
-            if (intent != null) {
-                intent.apply {
-                    putExtra("path", parentDir.absolutePath)
-                    putExtra("directory", parentDir.absolutePath)
+            val docUri = DownloadDirHelper.pathToDocumentsUiUri(parentDir.absolutePath)
+            if (docUri != null) {
+                val intent = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(docUri, "vnd.android.document/directory")
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
+                if (intent.resolveActivity(context.packageManager) != null) {
+                    context.startActivity(intent)
+                    Log.d("DownloadsScreen", "Opened folder via DocumentsUI: $docUri")
+                    return
+                }
+            }
+        } catch (e: Exception) {
+            Log.d("DownloadsScreen", "DocumentsUI failed: ${e.message}")
+        }
+
+        // ── Strategy 2: DocumentsUI with specific package (Google Files / DocumentsUI) ──
+        try {
+            val docUri = DownloadDirHelper.pathToDocumentsUiUri(parentDir.absolutePath)
+            if (docUri != null) {
+                val intent = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(docUri, "vnd.android.document/directory")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    setPackage("com.google.android.documentsui")
+                }
+                if (intent.resolveActivity(context.packageManager) != null) {
+                    context.startActivity(intent)
+                    Log.d("DownloadsScreen", "Opened folder via Google DocumentsUI")
+                    return
+                }
+            }
+        } catch (e: Exception) {
+            Log.d("DownloadsScreen", "Google DocumentsUI failed: ${e.message}")
+        }
+
+        // ── Strategy 3: Try com.android.documentsui (AOSP variant) ──
+        try {
+            val docUri = DownloadDirHelper.pathToDocumentsUiUri(parentDir.absolutePath)
+            if (docUri != null) {
+                val intent = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(docUri, "vnd.android.document/directory")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    setPackage("com.android.documentsui")
+                }
+                if (intent.resolveActivity(context.packageManager) != null) {
+                    context.startActivity(intent)
+                    Log.d("DownloadsScreen", "Opened folder via AOSP DocumentsUI")
+                    return
+                }
+            }
+        } catch (e: Exception) {
+            Log.d("DownloadsScreen", "AOSP DocumentsUI failed: ${e.message}")
+        }
+
+        // ── Strategy 4: Generic file:// VIEW intent (works on some OEM file managers) ──
+        try {
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                data = Uri.parse("file://${parentDir.absolutePath}")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            if (intent.resolveActivity(context.packageManager) != null) {
                 context.startActivity(intent)
-                Log.d("DownloadsScreen", "Launched ColorOS file manager")
+                Log.d("DownloadsScreen", "Opened folder via file:// VIEW")
                 return
             }
         } catch (e: Exception) {
-            Log.d("DownloadsScreen", "Launch ColorOS failed: ${e.message}")
+            Log.d("DownloadsScreen", "file:// VIEW failed: ${e.message}")
         }
 
-        // Approach 5: Open the specific file (user can then navigate to folder)
+        // ── Strategy 5: Open the file directly so user can "show in folder" from viewer ──
         try {
-            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            val mimeType = item.mimeType.takeIf { it.isNotEmpty() }
+                ?: getMimeTypeFromFileName(file.name)
+                ?: "*/*"
+            val uri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                file
+            )
             val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, getMimeTypeFromFileName(file.name) ?: "*/*")
+                setDataAndType(uri, mimeType)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             if (intent.resolveActivity(context.packageManager) != null) {
                 context.startActivity(intent)
-                Log.d("DownloadsScreen", "Opened file directly")
+                Log.d("DownloadsScreen", "Opened file directly as fallback")
                 return
             }
         } catch (e: Exception) {
-            Log.d("DownloadsScreen", "Open file failed: ${e.message}")
+            Log.d("DownloadsScreen", "Open file fallback failed: ${e.message}")
         }
 
-        // Final Fallback: Copy path to clipboard and show message
+        // ── Final Fallback: copy path to clipboard ──
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
         val clip = android.content.ClipData.newPlainText("File Location", parentDir.absolutePath)
         clipboard.setPrimaryClip(clip)
-        Toast.makeText(context, "Location: ${parentDir.absolutePath}", Toast.LENGTH_LONG).show()
+        Toast.makeText(context, "Copied path: ${parentDir.absolutePath}", Toast.LENGTH_LONG).show()
 
     } catch (e: Exception) {
         Log.e("DownloadsScreen", "Error opening location: ${e.message}")
