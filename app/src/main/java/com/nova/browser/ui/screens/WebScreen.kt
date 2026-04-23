@@ -52,8 +52,12 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Tab
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -97,6 +101,7 @@ fun WebScreen(
     onNavigateToTabs: () -> Unit,
     onNavigateToHistory: () -> Unit,
     onNavigateToDownloads: () -> Unit = {},
+    onNavigateToSettings: () -> Unit = {},
     pipEnabled: Boolean = false,
     historyRepository: HistoryRepository? = null,
     downloadRepository: DownloadRepository? = null,
@@ -296,144 +301,155 @@ fun WebScreen(
                             }
                         },
                         actions = {
-                            // New Tab button - allows opening new tab without leaving current video
-                            IconButton(onClick = {
-                                tabManager.addTab()
-                                onNavigateToTabs()
-                            }) {
+                            // Tabs button — always visible
+                            IconButton(onClick = onNavigateToTabs) {
                                 Icon(
-                                    imageVector = Icons.Default.Add,
-                                    contentDescription = "New Tab"
+                                    imageVector = Icons.Default.Tab,
+                                    contentDescription = "Tabs"
                                 )
                             }
-                            
-                            // Reading Mode toggle
-                            IconButton(onClick = {
-                                webView?.let { isReadingMode = ReadingModeInjector.toggle(it, isReadingMode) }
-                            }) {
-                                Icon(
-                                    imageVector = Icons.Default.Info,
-                                    contentDescription = "Reading Mode",
-                                    tint = if (isReadingMode) CoralRed else MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                            
-                            // PiP button (show if enabled - works on Android 8.0+)
-                            if (pipEnabled) {
-                                IconButton(onClick = { enterPipMode() }) {
+
+                            // Ad Block shield — compact, no badge box wrapper
+                            if (adBlockEnabled) {
+                                IconButton(onClick = {
+                                    Toast.makeText(
+                                        context,
+                                        if (blockedCount > 0) "$blockedCount ads blocked" else "Ad blocking active",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }) {
                                     Icon(
-                                        imageVector = Icons.Default.PictureInPicture,
-                                        contentDescription = "Picture-in-Picture"
+                                        imageVector = Icons.Default.Shield,
+                                        contentDescription = "Ad blocking active",
+                                        tint = if (blockedCount > 0)
+                                            androidx.compose.ui.graphics.Color(0xFF4CAF50)
+                                        else
+                                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
                                     )
                                 }
                             }
 
-                            // Ad Block shield — shows live blocked-request count for this page
-                            if (adBlockEnabled) {
-                                Box(contentAlignment = Alignment.TopEnd) {
-                                    IconButton(onClick = {
-                                        android.widget.Toast.makeText(
-                                            context,
-                                            if (blockedCount > 0) "$blockedCount ads blocked on this page" else "Ad blocking active",
-                                            android.widget.Toast.LENGTH_SHORT
-                                        ).show()
-                                    }) {
-                                        Icon(
-                                            imageVector = Icons.Default.Shield,
-                                            contentDescription = "Ad blocking active",
-                                            tint = if (blockedCount > 0)
-                                                androidx.compose.ui.graphics.Color(0xFF4CAF50)
-                                            else
-                                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
-                                        )
+                            // Overflow menu for remaining actions
+                            var showOverflow by remember { mutableStateOf(false) }
+                            IconButton(onClick = { showOverflow = true }) {
+                                Icon(
+                                    imageVector = Icons.Default.MoreVert,
+                                    contentDescription = "More options"
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = showOverflow,
+                                onDismissRequest = { showOverflow = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("New tab") },
+                                    onClick = {
+                                        showOverflow = false
+                                        tabManager.addTab()
+                                        onNavigateToTabs()
+                                    },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.Add, contentDescription = null)
                                     }
-                                    if (blockedCount > 0) {
-                                        Surface(
-                                            modifier = Modifier
-                                                .size(16.dp)
-                                                .align(Alignment.TopEnd)
-                                                .padding(end = 6.dp, top = 4.dp),
-                                            shape = CircleShape,
-                                            color = androidx.compose.ui.graphics.Color(0xFF4CAF50)
-                                        ) {
-                                            Box(contentAlignment = Alignment.Center) {
-                                                Text(
-                                                    text = if (blockedCount > 99) "99" else blockedCount.toString(),
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = Color.White
-                                                )
-                                            }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Reading mode") },
+                                    onClick = {
+                                        showOverflow = false
+                                        webView?.let { isReadingMode = ReadingModeInjector.toggle(it, isReadingMode) }
+                                    },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.Info, contentDescription = null)
+                                    }
+                                )
+                                if (pipEnabled) {
+                                    DropdownMenuItem(
+                                        text = { Text("Picture-in-picture") },
+                                        onClick = {
+                                            showOverflow = false
+                                            enterPipMode()
+                                        },
+                                        leadingIcon = {
+                                            Icon(Icons.Default.PictureInPicture, contentDescription = null)
                                         }
+                                    )
+                                }
+                                DropdownMenuItem(
+                                    text = { Text("History") },
+                                    onClick = {
+                                        showOverflow = false
+                                        onNavigateToHistory()
+                                    },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.History, contentDescription = null)
                                     }
-                                }
-                            }
-
-                            // History button
-                            IconButton(onClick = onNavigateToHistory) {
-                                Icon(
-                                    imageVector = Icons.Default.History,
-                                    contentDescription = "History"
                                 )
-                            }
-                            
-                            // Downloads button
-                            IconButton(onClick = onNavigateToDownloads) {
-                                Icon(
-                                    imageVector = Icons.Default.Download,
-                                    contentDescription = "Downloads"
-                                )
-                            }
-                            
-                            // Bookmark button
-                            IconButton(onClick = {
-                                // Add current page to bookmarks
-                                if (state.url.isNotBlank() && state.title.isNotBlank()) {
-                                    tabManager.currentTab?.let { currentTab ->
-                                        // We would need to add bookmark functionality here
-                                        // For now, just show a toast
-                                        Toast.makeText(
-                                            context,
-                                            "Bookmarked: ${state.title}",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
+                                DropdownMenuItem(
+                                    text = { Text("Downloads") },
+                                    onClick = {
+                                        showOverflow = false
+                                        onNavigateToDownloads()
+                                    },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.Download, contentDescription = null)
                                     }
-                                }
-                            }) {
-                                Icon(
-                                    imageVector = Icons.Default.Bookmark,
-                                    contentDescription = "Bookmark"
                                 )
-                            }
-
-                            // Share current page via Android share sheet
-                            IconButton(onClick = {
-                                if (state.url.isNotBlank()) {
-                                    val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                                        type = "text/plain"
-                                        putExtra(android.content.Intent.EXTRA_TEXT, state.url)
-                                        putExtra(android.content.Intent.EXTRA_SUBJECT, state.title.ifBlank { state.url })
+                                DropdownMenuItem(
+                                    text = { Text("Bookmark") },
+                                    onClick = {
+                                        showOverflow = false
+                                        if (state.url.isNotBlank() && state.title.isNotBlank()) {
+                                            Toast.makeText(
+                                                context,
+                                                "Bookmarked: ${state.title}",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                    },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.Bookmark, contentDescription = null)
                                     }
-                                    context.startActivity(android.content.Intent.createChooser(shareIntent, "Share via"))
-                                }
-                            }) {
-                                Icon(
-                                    imageVector = Icons.Default.Share,
-                                    contentDescription = "Share page"
                                 )
-                            }
-
-                            // Find in Page toggle
-                            IconButton(onClick = {
-                                showFindBar = !showFindBar
-                                if (!showFindBar) {
-                                    webView?.clearMatches()
-                                    findQuery = ""
-                                }
-                            }) {
-                                Icon(
-                                    imageVector = Icons.Default.Search,
-                                    contentDescription = "Find in page",
-                                    tint = if (showFindBar) CoralRed else MaterialTheme.colorScheme.onSurface
+                                DropdownMenuItem(
+                                    text = { Text("Share") },
+                                    onClick = {
+                                        showOverflow = false
+                                        if (state.url.isNotBlank()) {
+                                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                                type = "text/plain"
+                                                putExtra(Intent.EXTRA_TEXT, state.url)
+                                                putExtra(Intent.EXTRA_SUBJECT, state.title.ifBlank { state.url })
+                                            }
+                                            context.startActivity(Intent.createChooser(shareIntent, "Share via"))
+                                        }
+                                    },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.Share, contentDescription = null)
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(if (showFindBar) "Hide find bar" else "Find in page") },
+                                    onClick = {
+                                        showOverflow = false
+                                        showFindBar = !showFindBar
+                                        if (!showFindBar) {
+                                            webView?.clearMatches()
+                                            findQuery = ""
+                                        }
+                                    },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.Search, contentDescription = null)
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Settings") },
+                                    onClick = {
+                                        showOverflow = false
+                                        onNavigateToSettings()
+                                    },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.Settings, contentDescription = null)
+                                    }
                                 )
                             }
                         },

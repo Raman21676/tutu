@@ -40,6 +40,25 @@
     <string name="version">Version %1$s</string>
     <string name="about_description">Your companion for web and video content</string>
     
+    <!-- Output Directory Dialog -->
+    <string name="title_output_folder_location">Download Folder Location</string>
+    <string name="desc_output_folder">Choose where downloaded files will be saved.</string>
+    <string name="output_option_phone">Phone Storage</string>
+    <string name="output_option_sdcard">SD Card</string>
+    <string name="output_option_custom">Custom Path</string>
+    <string name="output_option_custom_desc">Enter your own directory path</string>
+    <string name="output_folder_name_label">Folder Name</string>
+    <string name="output_folder_path_label">Base Path</string>
+    <string name="hint_custom_path">/storage/emulated/0/MyFolder</string>
+    <string name="output_sdcard_no_card">No SD card detected</string>
+    <string name="output_permission_required_title">Permission Required</string>
+    <string name="output_permission_required_desc">All files access is needed to write to this location on Android 11+.</string>
+    <string name="output_grant_permission">Grant Permission</string>
+    <string name="toast_folder_set">Download folder saved</string>
+    <string name="toast_enter_path">Please enter a custom path</string>
+    <string name="action_save">Save</string>
+    <string name="action_cancel">Cancel</string>
+    
     <!-- Default bookmarks -->
     <string name="bookmark_youtube">YouTube</string>
     <string name="bookmark_facebook">Facebook</string>

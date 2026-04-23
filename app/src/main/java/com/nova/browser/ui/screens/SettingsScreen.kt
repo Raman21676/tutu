@@ -1,9 +1,11 @@
 package com.nova.browser.ui.screens
 
 import android.content.Intent
-import android.provider.DocumentsContract
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.Settings
+import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,12 +16,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.RotateRight
 import androidx.compose.material.icons.filled.CleaningServices
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Computer
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Fullscreen
@@ -31,11 +33,14 @@ import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Scaffold
@@ -46,6 +51,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -66,6 +72,8 @@ import com.nova.browser.ui.theme.CoralRed
 import com.nova.browser.ui.theme.TutuTheme
 import com.nova.browser.ui.viewmodel.SettingsViewModel
 import com.nova.browser.util.DownloadDirHelper
+import com.nova.browser.util.DownloadDirPreference
+import com.nova.browser.util.DownloadLocationType
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -78,22 +86,9 @@ fun SettingsScreen(
     val clearDataSuccess by viewModel.clearDataSuccess.collectAsState()
     var showClearDataDialog by remember { mutableStateOf(false) }
     var showSearchEngineDialog by remember { mutableStateOf(false) }
+    var showDirPicker by remember { mutableStateOf(false) }
     val context = LocalContext.current
-    
-    // Folder picker launcher
-    val folderPickerLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocumentTree()
-    ) { uri ->
-        uri?.let {
-            // Take persistent read+write permissions so it survives app restarts
-            context.contentResolver.takePersistableUriPermission(
-                it,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-            )
-            viewModel.setDownloadDirectory(it.toString())
-        }
-    }
-    
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
@@ -122,21 +117,21 @@ fun SettingsScreen(
         ) {
             // General Section
             SectionTitle(stringResource(R.string.settings_general))
-            
+
             ToggleSwitch(
                 checked = settings.httpsEnabled,
                 onCheckedChange = { viewModel.setHttpsEnabled(it) },
                 title = "HTTPS",
                 icon = Icons.Default.Lock
             )
-            
+
             ToggleSwitch(
                 checked = settings.fullscreen,
                 onCheckedChange = { viewModel.setFullscreen(it) },
                 title = stringResource(R.string.toggle_fullscreen),
                 icon = Icons.Default.Fullscreen
             )
-            
+
             ToggleSwitch(
                 checked = settings.autoRotate,
                 onCheckedChange = { viewModel.setAutoRotate(it) },
@@ -150,14 +145,14 @@ fun SettingsScreen(
                 title = "Desktop Mode",
                 icon = Icons.Default.Computer
             )
-            
+
             ToggleSwitch(
                 checked = settings.rememberChoice,
                 onCheckedChange = { viewModel.setRememberChoice(it) },
                 title = stringResource(R.string.dialog_remember_choice),
                 icon = Icons.Default.RememberMe
             )
-            
+
             // Search Engine Selector
             val currentEngine = SearchEngine.fromName(settings.searchEngine)
             Row(
@@ -185,14 +180,14 @@ fun SettingsScreen(
                     )
                 }
             }
-            
+
             Spacer(modifier = Modifier.height(24.dp))
             HorizontalDivider()
             Spacer(modifier = Modifier.height(24.dp))
-            
+
             // Privacy Section
             SectionTitle(stringResource(R.string.settings_privacy))
-            
+
             // Ad Blocker Toggle
             ToggleSwitch(
                 checked = settings.adBlockEnabled,
@@ -200,9 +195,9 @@ fun SettingsScreen(
                 title = "Block Ads & Trackers",
                 icon = Icons.Default.Shield
             )
-            
+
             Spacer(modifier = Modifier.height(16.dp))
-            
+
             Button(
                 onClick = { showClearDataDialog = true },
                 modifier = Modifier
@@ -224,27 +219,27 @@ fun SettingsScreen(
                     color = MaterialTheme.colorScheme.onErrorContainer
                 )
             }
-            
+
             Text(
                 text = stringResource(R.string.clear_data_summary),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp, start = 16.dp)
             )
-            
+
             Spacer(modifier = Modifier.height(24.dp))
             HorizontalDivider()
             Spacer(modifier = Modifier.height(24.dp))
-            
+
             // Downloads Section
             SectionTitle("Downloads")
-            
+
             // Download folder row
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { folderPickerLauncher.launch(null) }
-                    .padding(vertical = 12.dp),
+                    .padding(vertical = 12.dp)
+                    .clickable { showDirPicker = true },
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
@@ -266,39 +261,29 @@ fun SettingsScreen(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-                // Reset-to-default button (shown only when custom dir is set)
-                if (settings.downloadDirUri.isNotEmpty()) {
-                    IconButton(onClick = { viewModel.setDownloadDirectory("") }) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Reset to default",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
             }
-            
+
             Spacer(modifier = Modifier.height(24.dp))
             HorizontalDivider()
             Spacer(modifier = Modifier.height(24.dp))
-            
+
             // About Section
             SectionTitle(stringResource(R.string.settings_about))
-            
+
             Icon(
                 imageVector = Icons.Default.Info,
                 contentDescription = null,
                 modifier = Modifier.padding(vertical = 8.dp),
                 tint = CoralRed
             )
-            
+
             Text(
                 text = stringResource(R.string.about_description),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
-            
+
             Text(
                 text = stringResource(R.string.version, BuildConfig.VERSION_NAME),
                 style = MaterialTheme.typography.bodySmall,
@@ -308,16 +293,16 @@ fun SettingsScreen(
             )
         }
     }
-    
+
     // Search Engine Selection Dialog
     if (showSearchEngineDialog) {
         AlertDialog(
             onDismissRequest = { showSearchEngineDialog = false },
-            title = { 
+            title = {
                 Text(
-                    "Search Engine", 
+                    "Search Engine",
                     fontWeight = FontWeight.Bold
-                ) 
+                )
             },
             text = {
                 Column {
@@ -358,7 +343,15 @@ fun SettingsScreen(
             }
         )
     }
-    
+
+    // Output Directory Dialog
+    if (showDirPicker) {
+        OutputDirectoryDialog(
+            context = context,
+            onDismiss = { showDirPicker = false }
+        )
+    }
+
     // Clear Data Confirmation Dialog
     if (showClearDataDialog) {
         AlertDialog(
@@ -383,7 +376,7 @@ fun SettingsScreen(
             }
         )
     }
-    
+
     // Success Dialog
     if (clearDataSuccess) {
         AlertDialog(
@@ -397,7 +390,287 @@ fun SettingsScreen(
             }
         )
     }
+}
+
+/**
+ * Output Directory Selection Dialog
+ *
+ * Three options:
+ *  0 = Phone Storage  → root of internal storage (/sdcard/Nova Downloads)
+ *  1 = SD Card        → root of removable SD card (/storage/XXXX/Nova Downloads)
+ *  2 = Custom         → user-specified base path + user-specified folder name
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun OutputDirectoryDialog(
+    context: android.content.Context,
+    onDismiss: () -> Unit
+) {
+    var selectedOption by remember {
+        mutableIntStateOf(
+            when (DownloadDirPreference.getLocationType(context)) {
+                DownloadLocationType.SD_CARD -> 1
+                DownloadLocationType.CUSTOM -> 2
+                else -> 0  // PHONE_STORAGE (default)
+            }
+        )
+    }
+
+    var folderNameText by remember {
+        mutableStateOf(DownloadDirPreference.getFolderName(context))
+    }
+
+    var customPathText by remember {
+        mutableStateOf(DownloadDirPreference.getCustomPath(context) ?: "")
+    }
+    var customFolderNameText by remember {
+        mutableStateOf(DownloadDirPreference.getCustomFolderName(context))
+    }
+
+    val hasSdCard = remember { DownloadDirHelper.hasSdCard(context) }
+    val sdCardPath = remember { DownloadDirHelper.getSdCardPath(context) }
+
     
+    val noSdCardText = stringResource(R.string.output_sdcard_no_card)
+    val phoneDesc = remember(folderNameText) {
+        val name = folderNameText.ifBlank { DownloadDirHelper.DEFAULT_FOLDER_NAME }
+        "/storage/emulated/0/$name"
+    }
+    val sdDesc = remember(folderNameText, hasSdCard, noSdCardText) {
+        if (hasSdCard && sdCardPath != null) {
+            val name = folderNameText.ifBlank { DownloadDirHelper.DEFAULT_FOLDER_NAME }
+            "$sdCardPath/$name"
+        } else {
+            noSdCardText
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.title_output_folder_location)) },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    text = stringResource(R.string.desc_output_folder),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+
+                // Option 0: Phone Storage
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { selectedOption = 0 }
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = selectedOption == 0,
+                        onClick = { selectedOption = 0 }
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = stringResource(R.string.output_option_phone),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = phoneDesc,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
+                }
+
+                // Option 1: SD Card
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { selectedOption = 1 }
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = selectedOption == 1,
+                        onClick = { selectedOption = 1 }
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = stringResource(R.string.output_option_sdcard),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = sdDesc,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
+                }
+
+                // Option 2: Custom
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { selectedOption = 2 }
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = selectedOption == 2,
+                        onClick = { selectedOption = 2 }
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = stringResource(R.string.output_option_custom),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = stringResource(R.string.output_option_custom_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
+                }
+
+                // Folder name field (Phone / SD card)
+                if (selectedOption == 0 || selectedOption == 1) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = folderNameText,
+                        onValueChange = { folderNameText = it },
+                        label = { Text(stringResource(R.string.output_folder_name_label)) },
+                        placeholder = { Text(DownloadDirHelper.DEFAULT_FOLDER_NAME) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                // Custom fields
+                if (selectedOption == 2) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = customPathText,
+                        onValueChange = { customPathText = it },
+                        label = { Text(stringResource(R.string.output_folder_path_label)) },
+                        placeholder = { Text(stringResource(R.string.hint_custom_path)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = customFolderNameText,
+                        onValueChange = { customFolderNameText = it },
+                        label = { Text(stringResource(R.string.output_folder_name_label)) },
+                        placeholder = { Text(DownloadDirHelper.DEFAULT_FOLDER_NAME) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                // MANAGE_EXTERNAL_STORAGE hint (Android 11+)
+                if ((selectedOption == 0 || selectedOption == 1) &&
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+                    !Environment.isExternalStorageManager()
+                ) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = stringResource(R.string.output_permission_required_title),
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = stringResource(R.string.output_permission_required_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            TextButton(
+                                onClick = {
+                                    val intent = Intent(
+                                        Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                                        Uri.fromParts("package", context.packageName, null)
+                                    )
+                                    context.startActivity(intent)
+                                }
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.output_grant_permission),
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    when (selectedOption) {
+                        0 -> { // Phone Storage
+                            DownloadDirPreference.saveLocationType(context, DownloadLocationType.PHONE_STORAGE)
+                            val name = folderNameText.ifBlank { DownloadDirHelper.DEFAULT_FOLDER_NAME }
+                            DownloadDirPreference.saveFolderName(context, name)
+                            DownloadDirHelper.getDownloadDir(context)
+                            Toast.makeText(context, context.getString(R.string.toast_folder_set), Toast.LENGTH_SHORT).show()
+                            onDismiss()
+                        }
+                        1 -> { // SD Card
+                            if (!hasSdCard) {
+                                Toast.makeText(context, context.getString(R.string.output_sdcard_no_card), Toast.LENGTH_SHORT).show()
+                            } else {
+                                DownloadDirPreference.saveLocationType(context, DownloadLocationType.SD_CARD)
+                                val name = folderNameText.ifBlank { DownloadDirHelper.DEFAULT_FOLDER_NAME }
+                                DownloadDirPreference.saveFolderName(context, name)
+                                DownloadDirHelper.getDownloadDir(context)
+                                Toast.makeText(context, context.getString(R.string.toast_folder_set), Toast.LENGTH_SHORT).show()
+                                onDismiss()
+                            }
+                        }
+                        2 -> { // Custom
+                            if (customPathText.isBlank()) {
+                                Toast.makeText(context, context.getString(R.string.toast_enter_path), Toast.LENGTH_SHORT).show()
+                            } else {
+                                DownloadDirPreference.saveLocationType(context, DownloadLocationType.CUSTOM)
+                                DownloadDirPreference.saveCustomPath(context, customPathText)
+                                val name = customFolderNameText.ifBlank { DownloadDirHelper.DEFAULT_FOLDER_NAME }
+                                DownloadDirPreference.saveCustomFolderName(context, name)
+                                DownloadDirHelper.getDownloadDir(context)
+                                Toast.makeText(context, context.getString(R.string.toast_folder_set), Toast.LENGTH_SHORT).show()
+                                onDismiss()
+                            }
+                        }
+                    }
+                }
+            ) {
+                Text(stringResource(R.string.action_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_cancel))
+            }
+        }
+    )
 }
 
 @Composable
@@ -408,26 +681,6 @@ private fun SectionTitle(title: String) {
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.padding(vertical = 12.dp)
     )
-}
-
-/**
- * Extract a human-readable folder name from a SAF tree URI.
- * e.g. content://com.android.externalstorage.documents/tree/primary%3AMovies → "Movies"
- */
-private fun getFolderDisplayName(uriString: String): String {
-    return try {
-        val uri = android.net.Uri.parse(uriString)
-        val docId = DocumentsContract.getTreeDocumentId(uri)
-        val parts = docId.split(":")
-        if (parts.size >= 2) {
-            val path = parts[1]
-            path.split("/").last().ifEmpty { path }.ifEmpty { "Custom Folder" }
-        } else {
-            "Custom Folder"
-        }
-    } catch (e: Exception) {
-        "Custom Folder"
-    }
 }
 
 @Preview

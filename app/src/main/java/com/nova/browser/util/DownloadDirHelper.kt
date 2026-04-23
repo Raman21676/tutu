@@ -2,98 +2,240 @@ package com.nova.browser.util
 
 import android.content.Context
 import android.net.Uri
+import android.os.Build
 import android.os.Environment
+import android.os.storage.StorageManager
 import android.provider.DocumentsContract
 import android.util.Log
 import java.io.File
 
 /**
- * Centralized helper for the browser's download directory.
+ * The three download location modes available in Settings.
+ */
+enum class DownloadLocationType {
+    PHONE_STORAGE,   // Root of internal storage → /sdcard/Nova Downloads
+    SD_CARD,         // Root of SD card → /storage/XXXX-XXXX/Nova Downloads
+    CUSTOM           // User-specified base path + user-specified folder name
+}
+
+/**
+ * Preference helpers for download directory settings.
+ * Uses SharedPreferences for synchronous reads.
+ */
+object DownloadDirPreference {
+    private const val PREFS_NAME = "nova_output_prefs"
+    private const val KEY_LOCATION_TYPE = "download_location_type"
+    private const val KEY_FOLDER_NAME = "download_folder_name"
+    private const val KEY_CUSTOM_PATH = "download_custom_path"
+    private const val KEY_CUSTOM_FOLDER_NAME = "download_custom_folder_name"
+
+    fun getLocationType(context: Context): DownloadLocationType {
+        val saved = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_LOCATION_TYPE, null)
+        return when (saved) {
+            DownloadLocationType.SD_CARD.name -> DownloadLocationType.SD_CARD
+            DownloadLocationType.CUSTOM.name -> DownloadLocationType.CUSTOM
+            else -> DownloadLocationType.PHONE_STORAGE
+        }
+    }
+
+    fun saveLocationType(context: Context, type: DownloadLocationType) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putString(KEY_LOCATION_TYPE, type.name).apply()
+    }
+
+    fun getFolderName(context: Context): String {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_FOLDER_NAME, DownloadDirHelper.DEFAULT_FOLDER_NAME)
+            ?: DownloadDirHelper.DEFAULT_FOLDER_NAME
+    }
+
+    fun saveFolderName(context: Context, name: String) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putString(KEY_FOLDER_NAME, name).apply()
+    }
+
+    fun getCustomPath(context: Context): String? {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_CUSTOM_PATH, null)
+    }
+
+    fun saveCustomPath(context: Context, path: String?) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putString(KEY_CUSTOM_PATH, path).apply()
+    }
+
+    fun clearCustomPath(context: Context) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().remove(KEY_CUSTOM_PATH).apply()
+    }
+
+    fun getCustomFolderName(context: Context): String {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_CUSTOM_FOLDER_NAME, DownloadDirHelper.DEFAULT_FOLDER_NAME)
+            ?: DownloadDirHelper.DEFAULT_FOLDER_NAME
+    }
+
+    fun saveCustomFolderName(context: Context, name: String) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putString(KEY_CUSTOM_FOLDER_NAME, name).apply()
+    }
+}
+
+/**
+ * Helper to get the correct app download directory based on user's Settings choice.
  *
- * Inspired by RustPDF's OutputDirHelper.
+ * - PHONE_STORAGE : Environment.getExternalStorageDirectory() + folder name
+ *   → /storage/emulated/0/Nova Downloads
  *
- * Uses SharedPreferences for synchronous reads (avoiding runBlocking on the
- * main thread).  Default location:
- *   /storage/emulated/0/Download/Nova Downloads
+ * - SD_CARD : removable storage volume root + folder name
+ *   → /storage/XXXX-XXXX/Nova Downloads
  *
- * The user may override this via Settings → Downloads.
+ * - CUSTOM : user's chosen base directory + user's chosen folder name.
  */
 object DownloadDirHelper {
 
     const val DEFAULT_FOLDER_NAME = "Nova Downloads"
     private const val TAG = "DownloadDirHelper"
-    private const val PREFS_NAME = "nova_download_prefs"
+    private const val OLD_PREFS_NAME = "nova_download_prefs"
     private const val KEY_DIR_PATH = "download_dir_path"
-    private const val KEY_CUSTOM_URI = "download_dir_uri" // legacy SAF URI fallback
+    private const val KEY_CUSTOM_URI = "download_dir_uri"
 
-    /**
-     * Return the absolute File path of the current download directory.
-     * Creates the directory if it does not yet exist.
-     *
-     * Reads from SharedPreferences synchronously — safe to call on the main thread.
-     */
     fun getDownloadDir(context: Context): File {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-
-        // 1. Try the explicit saved path first (new system)
-        val savedPath = prefs.getString(KEY_DIR_PATH, null)
-        if (!savedPath.isNullOrEmpty()) {
-            val dir = File(savedPath)
-            if (dir.exists() || dir.mkdirs()) {
-                Log.d(TAG, "Using custom download dir: ${dir.absolutePath}")
-                return dir
-            }
+        // 1. Try new 3-option system
+        val type = DownloadDirPreference.getLocationType(context)
+        val dir = when (type) {
+            DownloadLocationType.PHONE_STORAGE -> phoneStorageDir(context)
+            DownloadLocationType.SD_CARD -> sdCardDir(context)
+            DownloadLocationType.CUSTOM -> customDir(context)
+        }
+        if (dir.exists() || dir.mkdirs()) {
+            Log.d(TAG, "Using download dir: ${dir.absolutePath}")
+            return dir
         }
 
-        // 2. Try legacy SAF URI (old system, converts to path)
-        val legacyUri = prefs.getString(KEY_CUSTOM_URI, null)
+        // 2. Try old system (legacy path from SharedPreferences)
+        val oldPrefs = context.getSharedPreferences(OLD_PREFS_NAME, Context.MODE_PRIVATE)
+        val savedPath = oldPrefs.getString(KEY_DIR_PATH, null)
+        if (!savedPath.isNullOrEmpty()) {
+            val oldDir = File(savedPath)
+            if (oldDir.exists() || oldDir.mkdirs()) {
+                Log.d(TAG, "Using legacy download dir: ${oldDir.absolutePath}")
+                return oldDir
+            }
+        }
+        val legacyUri = oldPrefs.getString(KEY_CUSTOM_URI, null)
         if (!legacyUri.isNullOrEmpty()) {
             val path = convertSafUriToPath(legacyUri)
             if (path != null) {
-                val dir = File(path)
-                if (dir.exists() || dir.mkdirs()) {
-                    Log.d(TAG, "Using legacy SAF dir: ${dir.absolutePath}")
-                    return dir
+                val oldDir = File(path)
+                if (oldDir.exists() || oldDir.mkdirs()) {
+                    Log.d(TAG, "Using legacy SAF dir: ${oldDir.absolutePath}")
+                    return oldDir
                 }
             }
         }
 
         // 3. Default fallback: public Downloads / Nova Downloads
-        val publicDownloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-        val novaDir = File(publicDownloads, DEFAULT_FOLDER_NAME)
-        if (!novaDir.exists()) {
-            novaDir.mkdirs()
+        val defaultDir = File(
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+            DEFAULT_FOLDER_NAME
+        )
+        defaultDir.mkdirs()
+        return defaultDir
+    }
+
+    fun getDisplayPath(context: Context): String = getDownloadDir(context).absolutePath
+
+    // ── Phone storage ──────────────────────────────────────────────────────────
+
+    private fun phoneStorageDir(context: Context): File {
+        val folderName = DownloadDirPreference.getFolderName(context).ifBlank { DEFAULT_FOLDER_NAME }
+        val root = Environment.getExternalStorageDirectory() // /storage/emulated/0
+        return File(root, folderName).also { if (!it.exists()) it.mkdirs() }
+    }
+
+    // ── SD card ────────────────────────────────────────────────────────────────
+
+    private fun sdCardDir(context: Context): File {
+        val folderName = DownloadDirPreference.getFolderName(context).ifBlank { DEFAULT_FOLDER_NAME }
+        val sdPath = getSdCardPath(context)
+        return if (sdPath != null) {
+            File(sdPath, folderName).also { if (!it.exists()) it.mkdirs() }
+        } else {
+            // No SD card — fall back to phone storage
+            phoneStorageDir(context)
         }
-        return novaDir
     }
 
     /**
-     * Save the custom directory path to SharedPreferences.
+     * Returns the absolute path of the first mounted removable storage volume,
+     * or null if no SD card is present.
      */
+    fun getSdCardPath(context: Context): String? {
+        return try {
+            val sm = context.getSystemService(Context.STORAGE_SERVICE) as StorageManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                sm.storageVolumes
+                    .firstOrNull { it.isRemovable && it.state == Environment.MEDIA_MOUNTED }
+                    ?.let { vol ->
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                            vol.directory?.absolutePath
+                        } else {
+                            @Suppress("DiscouragedPrivateApi")
+                            vol.javaClass.getMethod("getPath").invoke(vol) as? String
+                        }
+                    }
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    fun hasSdCard(context: Context): Boolean = getSdCardPath(context) != null
+
+    // ── Custom ─────────────────────────────────────────────────────────────────
+
+    private fun customDir(context: Context): File {
+        val basePath = DownloadDirPreference.getCustomPath(context)
+        val folderName = DownloadDirPreference.getCustomFolderName(context)
+            .ifBlank { DEFAULT_FOLDER_NAME }
+        return if (!basePath.isNullOrBlank()) {
+            File(basePath, folderName).also { if (!it.exists()) it.mkdirs() }
+        } else {
+            // No path set yet — fall back to phone storage
+            phoneStorageDir(context)
+        }
+    }
+
+    /**
+     * Fallback directory used when the configured output dir cannot be created.
+     * Uses app-private external storage → always writable, no special permission needed.
+     */
+    private fun fallbackDir(context: Context): File {
+        val folderName = DownloadDirPreference.getFolderName(context).ifBlank { DEFAULT_FOLDER_NAME }
+        return (context.getExternalFilesDir(null)?.let { File(it, folderName) }
+            ?: File(context.filesDir, folderName))
+            .also { if (!it.exists()) it.mkdirs() }
+    }
+
+    // ── Legacy helpers ─────────────────────────────────────────────────────────
+
     fun setDownloadDir(context: Context, path: String) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit()
-            .putString(KEY_DIR_PATH, path)
-            .apply()
+        context.getSharedPreferences(OLD_PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putString(KEY_DIR_PATH, path).apply()
     }
 
-    /**
-     * Reset to default (clear custom path and legacy URI).
-     */
     fun resetToDefault(context: Context) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit()
-            .remove(KEY_DIR_PATH)
-            .remove(KEY_CUSTOM_URI)
-            .apply()
+        // Clear new prefs
+        context.getSharedPreferences("nova_output_prefs", Context.MODE_PRIVATE).edit().clear().apply()
+        // Clear old prefs
+        context.getSharedPreferences(OLD_PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().remove(KEY_DIR_PATH).remove(KEY_CUSTOM_URI).apply()
     }
 
-    /**
-     * Convert a SAF tree URI (e.g. content://com.android.externalstorage.documents/tree/primary%3ADownload%2FMyFolder)
-     * to an absolute File path for primary (internal) storage.
-     *
-     * Returns null for external SD cards or unknown authorities.
-     */
     fun convertSafUriToPath(uriString: String): String? {
         return try {
             val uri = Uri.parse(uriString)
@@ -114,14 +256,6 @@ object DownloadDirHelper {
         }
     }
 
-    /**
-     * Convert an absolute file path to a DocumentsUI content URI that can be used
-     * with Intent.ACTION_VIEW to open the folder in the system file manager.
-     *
-     * Example:
-     *   /storage/emulated/0/Download/Nova Downloads
-     *   → content://com.android.externalstorage.documents/document/primary:Download/Nova%20Downloads
-     */
     fun pathToDocumentsUiUri(path: String): Uri? {
         val relative = when {
             path.startsWith("/storage/emulated/0/") -> path.removePrefix("/storage/emulated/0/")
@@ -129,12 +263,5 @@ object DownloadDirHelper {
             else -> return null
         }
         return Uri.parse("content://com.android.externalstorage.documents/document/primary:${Uri.encode(relative)}")
-    }
-
-    /**
-     * Get a human-readable display path for UI labels.
-     */
-    fun getDisplayPath(context: Context): String {
-        return getDownloadDir(context).absolutePath
     }
 }

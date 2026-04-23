@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -269,7 +270,6 @@ private fun DownloadItemCard(
                    item.status == DownloadEntity.STATUS_PAUSED
     val isCompleted = item.status == DownloadEntity.STATUS_SUCCESSFUL
     val isPaused = item.status == DownloadEntity.STATUS_PAUSED
-    val context = LocalContext.current
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -431,7 +431,7 @@ private fun DownloadItemCard(
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
-                                    Icons.Default.OpenInNew,
+                                    Icons.AutoMirrored.Filled.OpenInNew,
                                     contentDescription = "Open file",
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(20.dp)
@@ -565,9 +565,8 @@ private fun openDownloadedFile(context: Context, item: DownloadEntity) {
         val file = when {
             item.filePath.isNotEmpty() -> File(item.filePath)
             else -> {
-                // Check Nova Downloads first, then fallback to system Downloads
-                val novaDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Nova Downloads")
-                val novaFile = File(novaDir, item.fileName)
+                val downloadDir = DownloadDirHelper.getDownloadDir(context)
+                val novaFile = File(downloadDir, item.fileName)
                 if (novaFile.exists()) novaFile
                 else File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), item.fileName)
             }
@@ -617,8 +616,8 @@ private fun openFileLocation(context: Context, item: DownloadEntity) {
         val file = when {
             item.filePath.isNotEmpty() -> File(item.filePath)
             else -> {
-                val novaDir = DownloadDirHelper.getDownloadDir(context)
-                val novaFile = File(novaDir, item.fileName)
+                val downloadDir = DownloadDirHelper.getDownloadDir(context)
+                val novaFile = File(downloadDir, item.fileName)
                 if (novaFile.exists()) novaFile
                 else File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), item.fileName)
             }

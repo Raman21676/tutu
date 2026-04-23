@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.ScreenRotation
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SettingsBrightness
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bookmark
@@ -84,6 +85,7 @@ fun HomeScreen(
     onNavigateToDownloads: () -> Unit = {},
     onNavigateToTabs: () -> Unit = {},
     onNavigateToIncognito: (String) -> Unit = {},
+    onNavigateToSettings: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val bookmarks by viewModel.bookmarks.collectAsState()
@@ -214,6 +216,19 @@ fun HomeScreen(
                 Icon(
                     imageVector = Icons.Default.VisibilityOff,
                     contentDescription = "Incognito",
+                    tint = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+            
+            // Settings Button
+            IconButton(
+                onClick = onNavigateToSettings,
+                modifier = Modifier.size(48.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "Settings",
                     tint = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.size(28.dp)
                 )
@@ -426,7 +441,6 @@ fun HomeScreen(
     // Restore Session Dialog
     if (showRestoreDialog && lastUrl != null) {
         RestoreSessionDialog(
-            url = lastUrl!!,
             onConfirm = { remember ->
                 viewModel.onRestoreChoice(true, remember)
                 onNavigateToWeb(lastUrl!!)
@@ -443,7 +457,6 @@ fun HomeScreen(
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun RestoreSessionDialog(
-    url: String,
     onConfirm: (Boolean) -> Unit,
     onDismiss: (Boolean) -> Unit
 ) {

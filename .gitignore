@@ -38,3 +38,4 @@ google-services.json
 .ai-sessions/
 *.session-log.md
 .gradle-home/
+session-logs/

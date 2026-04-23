@@ -225,6 +225,9 @@ private fun TutuNavigation(
                 onNavigateToIncognito = { url ->
                     val encodedUrl = URLEncoder.encode(url, StandardCharsets.UTF_8.toString())
                     navController.navigate(Screen.Incognito.createRoute(encodedUrl))
+                },
+                onNavigateToSettings = {
+                    navController.navigate(Screen.Settings.route)
                 }
             )
         }
@@ -259,6 +262,9 @@ private fun TutuNavigation(
                 },
                 onNavigateToDownloads = {
                     navController.navigate(Screen.Downloads.route)
+                },
+                onNavigateToSettings = {
+                    navController.navigate(Screen.Settings.route)
                 },
                 historyRepository = historyRepository,
                 downloadRepository = downloadRepository

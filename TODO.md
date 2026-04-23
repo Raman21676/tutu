@@ -249,6 +249,11 @@
 - **Session 3:** Completed Downloads Manager UI, Play Store preparation
 - **Session 4:** Fixed JS-triggered downloads, fixed repository injection, added download tracking
   - **Known Issue:** Download status stuck at "Downloading" (Worker not updating database)
+- **Session 5 (2026-04-23):** TopAppBar overlap fix, Settings gear icon, RustPDF-style output directory dialog
+  - **Completed:** WebScreen overflow menu, HomeScreen Settings access, 3-option download folder dialog
+  - **Known Issue:** ColorOS file manager does not support folder navigation via intent (platform limitation)
+  - **Build Fix:** Updated local.properties JDK path to Java 21
+  - **See:** `2026-04-23.session-log.md` for full details
 
 ---
 
