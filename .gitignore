@@ -37,3 +37,4 @@ google-services.json
 # AI Session Logs (private)
 .ai-sessions/
 *.session-log.md
+.gradle-home/
