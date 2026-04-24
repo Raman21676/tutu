@@ -136,9 +136,9 @@ object DownloadDirHelper {
             }
         }
 
-        // 3. Default fallback: public Downloads / Nova Downloads
+        // 3. Default fallback: root of phone storage / Nova Downloads
         val defaultDir = File(
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+            Environment.getExternalStorageDirectory(),
             DEFAULT_FOLDER_NAME
         )
         defaultDir.mkdirs()
