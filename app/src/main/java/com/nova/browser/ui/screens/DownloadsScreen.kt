@@ -2,6 +2,7 @@ package com.nova.browser.ui.screens
 
 import android.app.DownloadManager
 import android.content.ActivityNotFoundException
+import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -53,6 +54,10 @@ fun DownloadsScreen(
     var selectionMode by remember { mutableStateOf(false) }
     val selectedItems = remember { mutableStateListOf<Long>() }
     var showBulkDeleteConfirm by remember { mutableStateOf(false) }
+    
+    // Folder bottom sheet state
+    var showFolderSheet by remember { mutableStateOf(false) }
+    var folderSheetPath by remember { mutableStateOf("") }
     
     val context = LocalContext.current
 
@@ -141,7 +146,17 @@ fun DownloadsScreen(
                             onCancel = { viewModel.cancelDownload(item.id) },
                             onDelete = { showDeleteConfirm = item.id },
                             onOpenFile = { openDownloadedFile(context, item) },
-                            onOpenLocation = { openFileLocation(context, item) },
+                            onOpenLocation = { 
+                                val opened = openFileLocation(context, item)
+                                if (!opened) {
+                                    val file = when {
+                                        item.filePath.isNotEmpty() -> File(item.filePath)
+                                        else -> File(DownloadDirHelper.getDownloadDir(context), item.fileName)
+                                    }
+                                    folderSheetPath = file.parentFile?.absolutePath ?: DownloadDirHelper.getDownloadDir(context).absolutePath
+                                    showFolderSheet = true
+                                }
+                            },
                             onLongPress = {
                                 selectionMode = true
                                 selectedItems.add(item.id)
@@ -246,6 +261,15 @@ fun DownloadsScreen(
                     Text("Cancel")
                 }
             }
+        )
+    }
+
+    // Folder contents bottom sheet
+    if (showFolderSheet && folderSheetPath.isNotEmpty()) {
+        FolderBottomSheet(
+            folderPath = folderSheetPath,
+            onDismiss = { showFolderSheet = false },
+            onOpenFile = { file -> openDownloadedFile(context, file) }
         )
     }
 }
@@ -640,14 +664,12 @@ private fun openDownloadedFile(context: Context, item: DownloadEntity) {
 
 /**
  * Open the file manager at the download location.
- *
- * Tries multiple strategies (most reliable first) and falls back
- * to opening the file directly or copying the path to clipboard.
+ * Returns true if an external app was launched, false otherwise.
  */
-private fun openFileLocation(context: Context, item: DownloadEntity) {
+private fun openFileLocation(context: Context, item: DownloadEntity): Boolean {
     Log.d("DownloadsScreen", "=== openFileLocation clicked for: ${item.fileName}, path: ${item.filePath}")
 
-    try {
+    return try {
         // Determine the actual file and its parent folder
         val file = when {
             item.filePath.isNotEmpty() -> File(item.filePath)
@@ -661,12 +683,11 @@ private fun openFileLocation(context: Context, item: DownloadEntity) {
 
         if (!file.exists()) {
             Toast.makeText(context, "File not found", Toast.LENGTH_SHORT).show()
-            return
+            return false
         }
 
         val parentDir = file.parentFile ?: DownloadDirHelper.getDownloadDir(context)
         Log.d("DownloadsScreen", "Opening folder: ${parentDir.absolutePath}")
-        Toast.makeText(context, "Opening folder...", Toast.LENGTH_SHORT).show()
 
         // ── Strategy 1: DocumentsUI with exact path derived from file location ──
         try {
@@ -679,7 +700,7 @@ private fun openFileLocation(context: Context, item: DownloadEntity) {
                 if (intent.resolveActivity(context.packageManager) != null) {
                     context.startActivity(intent)
                     Log.d("DownloadsScreen", "Opened folder via DocumentsUI: $docUri")
-                    return
+                    return true
                 }
             }
         } catch (e: Exception) {
@@ -698,7 +719,7 @@ private fun openFileLocation(context: Context, item: DownloadEntity) {
                 if (intent.resolveActivity(context.packageManager) != null) {
                     context.startActivity(intent)
                     Log.d("DownloadsScreen", "Opened folder via Google DocumentsUI")
-                    return
+                    return true
                 }
             }
         } catch (e: Exception) {
@@ -717,38 +738,34 @@ private fun openFileLocation(context: Context, item: DownloadEntity) {
                 if (intent.resolveActivity(context.packageManager) != null) {
                     context.startActivity(intent)
                     Log.d("DownloadsScreen", "Opened folder via AOSP DocumentsUI")
-                    return
+                    return true
                 }
             }
         } catch (e: Exception) {
             Log.d("DownloadsScreen", "AOSP DocumentsUI failed: ${e.message}")
         }
 
-        // ── Strategy 4: file:// with Uri.fromFile() — properly encodes spaces ──
+        // ── Strategy 4: ColorOS file manager main screen ──
         try {
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(Uri.fromFile(parentDir), "resource/folder")
+            val intent = Intent("android.intent.action.OPEN_FILEMANAGER").apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                `package` = "com.coloros.filemanager"
             }
             if (intent.resolveActivity(context.packageManager) != null) {
                 context.startActivity(intent)
-                Log.d("DownloadsScreen", "Opened folder via file:// VIEW (Uri.fromFile)")
-                return
+                Log.d("DownloadsScreen", "Opened ColorOS file manager")
+                return true
             }
         } catch (e: Exception) {
-            Log.d("DownloadsScreen", "file:// VIEW failed: ${e.message}")
+            Log.d("DownloadsScreen", "ColorOS file manager failed: ${e.message}")
         }
 
-        // ── Final fallback: copy path (ColorOS cannot open specific folders via intent) ──
-        val path = parentDir.absolutePath
-        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Download path", path))
-        Toast.makeText(context, "Saved in: $path\n(Path copied to clipboard)", Toast.LENGTH_LONG).show()
-        Log.d("DownloadsScreen", "Copied folder path to clipboard: $path")
+        Log.d("DownloadsScreen", "All folder-open strategies failed, will show in-app sheet")
+        false
 
     } catch (e: Exception) {
         Log.e("DownloadsScreen", "Error opening location: ${e.message}")
-        Toast.makeText(context, "Cannot open file location", Toast.LENGTH_SHORT).show()
+        false
     }
 }
 
@@ -771,5 +788,169 @@ private fun formatBytes(bytes: Long): String {
         bytes >= 1024 * 1024 -> String.format("%.2f MB", bytes / (1024.0 * 1024.0))
         bytes >= 1024 -> String.format("%.2f KB", bytes / 1024.0)
         else -> "$bytes B"
+    }
+}
+
+/**
+ * Overload to open a downloaded file directly from a File object
+ */
+private fun openDownloadedFile(context: Context, file: File) {
+    if (!file.exists()) {
+        Toast.makeText(context, "File not found", Toast.LENGTH_SHORT).show()
+        return
+    }
+    try {
+        val mimeType = when {
+            file.name.lowercase().endsWith(".apk") -> "application/vnd.android.package-archive"
+            else -> getMimeTypeFromFileName(file.name) ?: "*/*"
+        }
+        val uri = FileProvider.getUriForFile(
+            context, "${context.packageName}.fileprovider", file
+        )
+        val viewIntent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, mimeType)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.packageManager
+            .queryIntentActivities(viewIntent, PackageManager.MATCH_DEFAULT_ONLY)
+            .forEach { info ->
+                context.grantUriPermission(
+                    info.activityInfo.packageName,
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
+        context.startActivity(Intent.createChooser(viewIntent, "Open with"))
+    } catch (e: Exception) {
+        Log.w("DownloadsScreen", "FileProvider failed: ${e.message}")
+        try {
+            val mimeType = when {
+                file.name.lowercase().endsWith(".apk") -> "application/vnd.android.package-archive"
+                else -> getMimeTypeFromFileName(file.name) ?: "*/*"
+            }
+            @Suppress("DEPRECATION")
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(Uri.fromFile(file), mimeType)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(Intent.createChooser(intent, "Open with"))
+        } catch (e2: Exception) {
+            Toast.makeText(context, "Cannot open file", Toast.LENGTH_SHORT).show()
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FolderBottomSheet(
+    folderPath: String,
+    onDismiss: () -> Unit,
+    onOpenFile: (File) -> Unit
+) {
+    val context = LocalContext.current
+    val folder = remember(folderPath) { File(folderPath) }
+    val files = remember(folderPath) {
+        folder.listFiles()?.filter { it.isFile }?.sortedByDescending { it.lastModified() } ?: emptyList()
+    }
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp)
+        ) {
+            // Header
+            Text(
+                text = "Download Folder",
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            // Path row with copy button
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = folderPath,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                IconButton(
+                    onClick = {
+                        clipboard.setPrimaryClip(ClipData.newPlainText("Path", folderPath))
+                        Toast.makeText(context, "Path copied", Toast.LENGTH_SHORT).show()
+                    }
+                ) {
+                    Icon(Icons.Default.ContentCopy, contentDescription = "Copy path")
+                }
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+
+            if (files.isEmpty()) {
+                Text(
+                    text = "No files in this folder",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.padding(vertical = 16.dp)
+                )
+            } else {
+                Text(
+                    text = "${files.size} file(s)",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                files.forEach { file ->
+                    val dateStr = SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault())
+                        .format(Date(file.lastModified()))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onOpenFile(file) }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.InsertDriveFile,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = file.name,
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = "$dateStr · ${formatBytes(file.length())}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                            contentDescription = "Open",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
+        }
     }
 }
