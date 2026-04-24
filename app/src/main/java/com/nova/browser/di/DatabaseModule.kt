@@ -33,4 +33,9 @@ object DatabaseModule {
     fun provideSiteSettingsDao(database: TutuDatabase): SiteSettingsDao {
         return database.siteSettingsDao()
     }
+
+    @Provides
+    fun provideUserScriptDao(database: TutuDatabase): com.nova.browser.data.local.db.UserScriptDao {
+        return database.userScriptDao()
+    }
 }

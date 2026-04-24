@@ -56,6 +56,9 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Tab
+import androidx.compose.material.icons.filled.TravelExplore
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -91,6 +94,10 @@ import com.nova.browser.util.DarkModeInjector
 import com.nova.browser.util.ReadingModeInjector
 import com.nova.browser.util.AdBlocker
 import com.nova.browser.util.AdBlockCosmeticInjector
+import com.nova.browser.util.ResourceSniffer
+import com.nova.browser.util.ResourceSnifferJsBridge
+import com.nova.browser.util.UserScriptEngine
+import com.nova.browser.util.UserScriptGmApi
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -105,6 +112,7 @@ fun WebScreen(
     pipEnabled: Boolean = false,
     historyRepository: HistoryRepository? = null,
     downloadRepository: DownloadRepository? = null,
+    userScriptsViewModel: com.nova.browser.ui.viewmodel.UserScriptsViewModel = androidx.hilt.navigation.compose.hiltViewModel(),
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.state.collectAsState()
@@ -115,6 +123,15 @@ fun WebScreen(
     
     // Get AdBlocker instance
     val adBlocker = remember { AdBlocker.getInstance() }
+    
+    // Resource Sniffer for media detection
+    val resourceSniffer = remember { ResourceSniffer(adBlocker) }
+    val snifferResources by resourceSniffer.resources.collectAsState()
+    var showSnifferSheet by remember { mutableStateOf(false) }
+    
+    // User Scripts
+    val userScriptEngine = remember { UserScriptEngine() }
+    val enabledScripts by userScriptsViewModel.enabledScripts.collectAsState()
     
     // Tab manager for tracking tab state
     val tabManager = remember { TabManager.getInstance() }
@@ -329,6 +346,23 @@ fun WebScreen(
                                 }
                             }
 
+                            // Resource Sniffer button
+                            val snifferCount = resourceSniffer.getTotalCount()
+                            IconButton(onClick = { showSnifferSheet = true }) {
+                                BadgedBox(
+                                    badge = {
+                                        if (snifferCount > 0) {
+                                            Badge { Text(snifferCount.toString()) }
+                                        }
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.TravelExplore,
+                                        contentDescription = "Resource sniffer"
+                                    )
+                                }
+                            }
+
                             // Overflow menu for remaining actions
                             var showOverflow by remember { mutableStateOf(false) }
                             IconButton(onClick = { showOverflow = true }) {
@@ -350,6 +384,16 @@ fun WebScreen(
                                     },
                                     leadingIcon = {
                                         Icon(Icons.Default.Add, contentDescription = null)
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Resource sniffer") },
+                                    onClick = {
+                                        showOverflow = false
+                                        showSnifferSheet = true
+                                    },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.TravelExplore, contentDescription = null)
                                     }
                                 )
                                 DropdownMenuItem(
@@ -611,6 +655,18 @@ fun WebScreen(
                             "AndroidDownload"
                         )
                         
+                        // Add JavaScript interface for resource sniffer
+                        addJavascriptInterface(
+                            ResourceSnifferJsBridge(resourceSniffer),
+                            "ResourceSnifferBridge"
+                        )
+                        
+                        // Add JavaScript interface for user scripts GM API
+                        addJavascriptInterface(
+                            UserScriptGmApi(ctx),
+                            "NovaGmApi"
+                        )
+                        
                         // Handle file downloads
                         setDownloadListener { downloadUrl, userAgent, contentDisposition, mimetype, contentLength ->
                             Log.d("WebScreen", "=== DownloadListener triggered: $downloadUrl")
@@ -724,6 +780,7 @@ fun WebScreen(
                                 Log.d(TAG, "Page started: $url")
                                 url?.let { 
                                     viewModel.onPageStarted(it)
+                                    resourceSniffer.onPageStarted(it)
                                 }
                                 // Reset reading mode and blocked counter on each new page
                                 isReadingMode = false
@@ -732,6 +789,11 @@ fun WebScreen(
                                 // CRITICAL: Zero JS injection for TikTok!
                                 // User's Attempt 3 proved: no JS injection = feed works beyond 2 reels
                                 // ANY navigator/window modification is detected by webmssdk.js
+                                
+                                // Inject document-start user scripts (non-TikTok only)
+                                if (url != null && !url.contains("tiktok")) {
+                                    userScriptEngine.injectScripts(view!!, enabledScripts, url, "document-start")
+                                }
                             }
                             
                             override fun onPageCommitVisible(view: WebView?, url: String?) {
@@ -750,10 +812,12 @@ fun WebScreen(
                                 view.requestLayout()
                                 view.post { view.invalidate() }
                                 
-                                // Inject download interceptor + cosmetic ad filter (safe for non-TikTok)
+                                // Inject download interceptor + cosmetic ad filter + resource sniffer + user scripts (safe for non-TikTok)
                                 if (!url.contains("tiktok")) {
                                     injectDownloadInterceptor(view)
                                     AdBlockCosmeticInjector.inject(view)
+                                    view.evaluateJavascript(ResourceSnifferJsBridge.getInjectionScript(), null)
+                                    userScriptEngine.injectScripts(view, enabledScripts, url, "document-end")
                                 }
                             }
                             
@@ -766,10 +830,17 @@ fun WebScreen(
                             }
                             
                             override fun shouldInterceptRequest(view: WebView?, request: android.webkit.WebResourceRequest?): android.webkit.WebResourceResponse? {
+                                val url = request?.url?.toString()
+                                
+                                // Report to resource sniffer (before ad blocking so we still catch media from ad domains)
+                                if (!url.isNullOrBlank()) {
+                                    resourceSniffer.onRequest(url, request?.requestHeaders?.get("Accept"))
+                                }
+                                
                                 // Check if ad blocking is enabled
                                 if (adBlockEnabled && request?.url != null) {
-                                    val url = request.url.toString()
-                                    if (adBlocker.shouldBlock(url)) {
+                                    val requestUrl = request.url.toString()
+                                    if (adBlocker.shouldBlock(requestUrl)) {
                                         // Increment badge counter (thread-safe — called from IO thread)
                                         viewModel.incrementBlockedCount()
                                         // Return empty response for blocked ads/trackers
@@ -957,6 +1028,24 @@ fun WebScreen(
         QrShareDialog(
             currentUrl = state.url,
             onDismiss = { showQrDialog = false }
+        )
+    }
+
+    // Resource Sniffer Bottom Sheet
+    if (showSnifferSheet) {
+        ResourceSnifferSheet(
+            resources = snifferResources,
+            onDismiss = { showSnifferSheet = false },
+            onDownload = { resource ->
+                val download = PendingDownload(
+                    url = resource.url,
+                    fileName = resource.displayName,
+                    mimeType = resource.mimeType ?: "*/*",
+                    userAgent = webView?.settings?.userAgentString ?: ""
+                )
+                checkAndDownload(download, downloadRepository)
+                showSnifferSheet = false
+            }
         )
     }
 }

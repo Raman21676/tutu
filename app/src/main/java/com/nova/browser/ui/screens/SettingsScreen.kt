@@ -82,6 +82,7 @@ import com.nova.browser.util.DownloadLocationType
 fun SettingsScreen(
     viewModel: SettingsViewModel,
     onNavigateBack: () -> Unit,
+    onNavigateToUserScripts: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val settings by viewModel.settings.collectAsState()
@@ -176,8 +177,8 @@ fun SettingsScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { showSearchEngineDialog = true }
-                    .padding(vertical = 12.dp),
+                    .padding(vertical = 12.dp)
+                    .clickable { showSearchEngineDialog = true },
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
@@ -213,6 +214,33 @@ fun SettingsScreen(
                 title = "Block Ads & Trackers",
                 icon = Icons.Default.Shield
             )
+
+            // User Scripts
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp)
+                    .clickable { onNavigateToUserScripts() },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Computer,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(end = 12.dp)
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "User Scripts",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = "Manage Tampermonkey-style scripts",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 

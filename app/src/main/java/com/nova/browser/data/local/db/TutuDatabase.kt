@@ -9,15 +9,17 @@ import androidx.room.RoomDatabase
     entities = [
         HistoryEntity::class,
         DownloadEntity::class,
-        SiteSettingsEntity::class
+        SiteSettingsEntity::class,
+        UserScriptEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 abstract class TutuDatabase : RoomDatabase() {
     abstract fun historyDao(): HistoryDao
     abstract fun downloadDao(): DownloadDao
     abstract fun siteSettingsDao(): SiteSettingsDao
+    abstract fun userScriptDao(): UserScriptDao
 
     companion object {
         @Volatile
