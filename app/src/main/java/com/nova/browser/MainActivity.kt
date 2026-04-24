@@ -39,6 +39,7 @@ import com.nova.browser.ui.screens.DownloadsScreen
 import com.nova.browser.ui.screens.HistoryScreen
 import com.nova.browser.ui.screens.HomeScreen
 import com.nova.browser.ui.screens.IncognitoWebScreen
+import com.nova.browser.ui.screens.NetworkLogScreen
 import com.nova.browser.ui.screens.SettingsScreen
 import com.nova.browser.ui.screens.TabsScreen
 import com.nova.browser.ui.screens.UserScriptsScreen
@@ -342,12 +343,19 @@ private fun TutuNavigation(
             SettingsScreen(
                 viewModel = viewModel,
                 onNavigateBack = { navController.popBackStack() },
-                onNavigateToUserScripts = { navController.navigate(Screen.UserScripts.route) }
+                onNavigateToUserScripts = { navController.navigate(Screen.UserScripts.route) },
+                onNavigateToNetworkLog = { navController.navigate(Screen.NetworkLog.route) }
             )
         }
         
         composable(Screen.UserScripts.route) {
             UserScriptsScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        
+        composable(Screen.NetworkLog.route) {
+            NetworkLogScreen(
                 onNavigateBack = { navController.popBackStack() }
             )
         }
@@ -392,6 +400,7 @@ sealed class Screen(val route: String) {
     data object Downloads : Screen("downloads")
     data object Settings : Screen("settings")
     data object UserScripts : Screen("user_scripts")
+    data object NetworkLog : Screen("network_log")
     data object Incognito : Screen("incognito/{url}") {
         fun createRoute(url: String) = "incognito/$url"
     }

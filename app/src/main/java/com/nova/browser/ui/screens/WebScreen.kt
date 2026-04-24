@@ -9,6 +9,8 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
 import android.os.Message
+import android.print.PrintAttributes
+import android.print.PrintManager
 import android.util.Log
 import android.util.Rational
 import android.view.View
@@ -54,6 +56,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Tab
 import androidx.compose.material.icons.filled.TravelExplore
@@ -94,6 +97,7 @@ import com.nova.browser.util.DarkModeInjector
 import com.nova.browser.util.ReadingModeInjector
 import com.nova.browser.util.AdBlocker
 import com.nova.browser.util.AdBlockCosmeticInjector
+import com.nova.browser.util.NetworkLog
 import com.nova.browser.util.ResourceSniffer
 import com.nova.browser.util.ResourceSnifferJsBridge
 import com.nova.browser.util.UserScriptEngine
@@ -132,6 +136,8 @@ fun WebScreen(
     // User Scripts
     val userScriptEngine = remember { UserScriptEngine() }
     val enabledScripts by userScriptsViewModel.enabledScripts.collectAsState()
+    
+    // NetworkLog is a singleton object — no local instance needed
     
     // Tab manager for tracking tab state
     val tabManager = remember { TabManager.getInstance() }
@@ -452,6 +458,21 @@ fun WebScreen(
                                     },
                                     leadingIcon = {
                                         Icon(Icons.Default.Bookmark, contentDescription = null)
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Print page") },
+                                    onClick = {
+                                        showOverflow = false
+                                        webView?.let { wv ->
+                                            val printManager = context.getSystemService(android.content.Context.PRINT_SERVICE) as PrintManager
+                                            val jobName = "${wv.title ?: "Page"}"
+                                            val printAdapter = wv.createPrintDocumentAdapter(jobName)
+                                            printManager.print(jobName, printAdapter, PrintAttributes.Builder().build())
+                                        }
+                                    },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.Print, contentDescription = null)
                                     }
                                 )
                                 DropdownMenuItem(
@@ -781,6 +802,7 @@ fun WebScreen(
                                 url?.let { 
                                     viewModel.onPageStarted(it)
                                     resourceSniffer.onPageStarted(it)
+                                    NetworkLog.onPageStarted(it)
                                 }
                                 // Reset reading mode and blocked counter on each new page
                                 isReadingMode = false
@@ -823,7 +845,7 @@ fun WebScreen(
                             
                             override fun onLoadResource(view: WebView?, url: String?) {
                                 super.onLoadResource(view, url)
-                                // Log resources for debugging
+                                NetworkLog.onLoadResource(url)
                                 if (url?.contains("tiktok") == true || url?.contains("googlevideo") == true) {
                                     Log.d(TAG, "Loading resource: $url")
                                 }
@@ -832,18 +854,19 @@ fun WebScreen(
                             override fun shouldInterceptRequest(view: WebView?, request: android.webkit.WebResourceRequest?): android.webkit.WebResourceResponse? {
                                 val url = request?.url?.toString()
                                 
-                                // Report to resource sniffer (before ad blocking so we still catch media from ad domains)
+                                // Report to resource sniffer and network log (before ad blocking)
                                 if (!url.isNullOrBlank()) {
                                     resourceSniffer.onRequest(url, request?.requestHeaders?.get("Accept"))
                                 }
                                 
                                 // Check if ad blocking is enabled
+                                var isBlocked = false
                                 if (adBlockEnabled && request?.url != null) {
                                     val requestUrl = request.url.toString()
                                     if (adBlocker.shouldBlock(requestUrl)) {
-                                        // Increment badge counter (thread-safe — called from IO thread)
+                                        isBlocked = true
                                         viewModel.incrementBlockedCount()
-                                        // Return empty response for blocked ads/trackers
+                                        NetworkLog.onRequest(request, isBlocked = true)
                                         return android.webkit.WebResourceResponse(
                                             "text/plain",
                                             "UTF-8",
@@ -851,6 +874,11 @@ fun WebScreen(
                                         )
                                     }
                                 }
+                                
+                                if (request != null) {
+                                    NetworkLog.onRequest(request, isBlocked = false)
+                                }
+                                
                                 return super.shouldInterceptRequest(view, request)
                             }
                             
