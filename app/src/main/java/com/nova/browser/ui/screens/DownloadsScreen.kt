@@ -5,6 +5,7 @@ import android.content.ActivityNotFoundException
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -561,45 +562,80 @@ private fun EmptyDownloadsView() {
  * Open the downloaded file with appropriate app
  */
 private fun openDownloadedFile(context: Context, item: DownloadEntity) {
+    val file = when {
+        item.filePath.isNotEmpty() -> File(item.filePath)
+        else -> {
+            val downloadDir = DownloadDirHelper.getDownloadDir(context)
+            val f = File(downloadDir, item.fileName)
+            if (f.exists()) f else File(
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                item.fileName
+            )
+        }
+    }
+
+    if (!file.exists()) {
+        Toast.makeText(context, "File not found: ${file.absolutePath}", Toast.LENGTH_LONG).show()
+        return
+    }
+
+    val mimeType = when {
+        file.name.lowercase().endsWith(".apk") -> "application/vnd.android.package-archive"
+        item.mimeType.isNotEmpty() && item.mimeType != "application/octet-stream" -> item.mimeType
+        else -> getMimeTypeFromFileName(file.name) ?: "*/*"
+    }
+
+    // ── Attempt 1: FileProvider with explicit URI grants (required for chooser) ──
     try {
-        val file = when {
-            item.filePath.isNotEmpty() -> File(item.filePath)
-            else -> {
-                val downloadDir = DownloadDirHelper.getDownloadDir(context)
-                val novaFile = File(downloadDir, item.fileName)
-                if (novaFile.exists()) novaFile
-                else File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), item.fileName)
-            }
-        }
-
-        if (!file.exists()) {
-            Toast.makeText(context, "File not found: ${item.fileName}", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val mimeType = item.mimeType.takeIf { it.isNotEmpty() } 
-            ?: getMimeTypeFromFileName(item.fileName)
-            ?: "*/*"
-
         val uri = FileProvider.getUriForFile(
             context,
             "${context.packageName}.fileprovider",
             file
         )
 
-        val intent = Intent(Intent.ACTION_VIEW).apply {
+        val viewIntent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, mimeType)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
 
-        val chooser = Intent.createChooser(intent, "Open with")
+        // KEY FIX: Grant permission explicitly to every app that can handle this
+        val resolvedApps = context.packageManager
+            .queryIntentActivities(viewIntent, PackageManager.MATCH_DEFAULT_ONLY)
+        for (info in resolvedApps) {
+            context.grantUriPermission(
+                info.activityInfo.packageName,
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+        }
+
+        val chooser = Intent.createChooser(viewIntent, "Open with")
         context.startActivity(chooser)
+        Log.d("DownloadsScreen", "Opened file via FileProvider+explicit grants")
+        return
 
     } catch (e: Exception) {
-        Log.e("DownloadsScreen", "Error opening file: ${e.message}")
-        Toast.makeText(context, "Cannot open file: ${e.message}", Toast.LENGTH_SHORT).show()
+        Log.w("DownloadsScreen", "FileProvider attempt failed: ${e.message}")
     }
+
+    // ── Attempt 2: file:// URI — works on Android ≤ 7.1.1 (API 25) ──
+    try {
+        @Suppress("DEPRECATION")
+        val fileUri = Uri.fromFile(file)
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(fileUri, mimeType)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        val chooser = Intent.createChooser(intent, "Open with")
+        context.startActivity(chooser)
+        Log.d("DownloadsScreen", "Opened file via file:// URI")
+        return
+    } catch (e: Exception) {
+        Log.w("DownloadsScreen", "file:// attempt failed: ${e.message}")
+    }
+
+    Toast.makeText(context, "No app found to open this file", Toast.LENGTH_LONG).show()
 }
 
 /**
@@ -703,28 +739,53 @@ private fun openFileLocation(context: Context, item: DownloadEntity) {
             Log.d("DownloadsScreen", "file:// VIEW failed: ${e.message}")
         }
 
-        // ── Strategy 5: Open the file directly — most useful fallback on ColorOS ──
+        // ── Strategy 5: Open file directly with explicit URI permission grants ──
         try {
-            val mimeType = item.mimeType.takeIf { it.isNotEmpty() }
-                ?: getMimeTypeFromFileName(file.name)
-                ?: "*/*"
+            val mimeType = when {
+                file.name.lowercase().endsWith(".apk") -> "application/vnd.android.package-archive"
+                item.mimeType.isNotEmpty() && item.mimeType != "application/octet-stream" -> item.mimeType
+                else -> getMimeTypeFromFileName(file.name) ?: "*/*"
+            }
             val uri = FileProvider.getUriForFile(
-                context,
-                "${context.packageName}.fileprovider",
-                file
+                context, "${context.packageName}.fileprovider", file
             )
-            val intent = Intent(Intent.ACTION_VIEW).apply {
+            val viewIntent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(uri, mimeType)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
-            if (intent.resolveActivity(context.packageManager) != null) {
-                context.startActivity(intent)
-                Log.d("DownloadsScreen", "Opened file directly")
-                return
-            }
+            // Explicitly grant permission to every app before showing chooser
+            context.packageManager
+                .queryIntentActivities(viewIntent, PackageManager.MATCH_DEFAULT_ONLY)
+                .forEach { info ->
+                    context.grantUriPermission(
+                        info.activityInfo.packageName,
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                }
+            context.startActivity(Intent.createChooser(viewIntent, "Open with"))
+            Log.d("DownloadsScreen", "Opened file with explicit URI grants")
+            return
         } catch (e: Exception) {
-            Log.d("DownloadsScreen", "Open file directly failed: ${e.message}")
+            Log.w("DownloadsScreen", "FileProvider+grants failed: ${e.message}")
+            // Fallback: file:// URI
+            try {
+                val mimeType = when {
+                    file.name.lowercase().endsWith(".apk") -> "application/vnd.android.package-archive"
+                    else -> getMimeTypeFromFileName(file.name) ?: "*/*"
+                }
+                @Suppress("DEPRECATION")
+                val intent = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(Uri.fromFile(file), mimeType)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(Intent.createChooser(intent, "Open with"))
+                Log.d("DownloadsScreen", "Opened file via file:// fallback")
+                return
+            } catch (e2: Exception) {
+                Log.w("DownloadsScreen", "file:// fallback failed: ${e2.message}")
+            }
         }
 
         // ── Strategy 6: System Downloads app ──
@@ -755,10 +816,13 @@ private fun openFileLocation(context: Context, item: DownloadEntity) {
  * Get MIME type from file extension
  */
 private fun getMimeTypeFromFileName(fileName: String): String? {
-    val extension = fileName.substringAfterLast('.', "")
-    return if (extension.isNotEmpty()) {
-        MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension.lowercase())
-    } else null
+    val extension = fileName.substringAfterLast('.', "").lowercase()
+    return when (extension) {
+        "apk" -> "application/vnd.android.package-archive"
+        else -> if (extension.isNotEmpty()) {
+            MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
+        } else null
+    }
 }
 
 private fun formatBytes(bytes: Long): String {
