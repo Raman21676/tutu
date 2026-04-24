@@ -26,8 +26,8 @@
 | **Custom CSS/JS per site** | ✅ Yes | ❌ No (scripts are global) | 🔴 Missing |
 | **Per-site Settings** | ✅ Granular | ⚠️ DB exists, partially wired | 🟡 Partial |
 | **Gesture Controls** | ✅ Rich (swipe toolbar, etc.) | ❌ No | 🔴 Missing |
-| **Custom Search Engines** | ✅ Yes | ❌ Fixed list (5 engines) | 🔴 Missing |
-| **Import/Export Data** | ✅ Settings + bookmarks | ❌ No | 🔴 Missing |
+| **Custom Search Engines** | ✅ Yes | ✅ Yes (NEW) | ✅ Closed |
+| **Import/Export Data** | ✅ Settings + bookmarks | ✅ Yes (NEW) | ✅ Closed |
 | **Text Resize** | ✅ Yes | ❌ No | 🔴 Missing |
 | **Custom Homepage** | ✅ Highly customizable | ⚠️ Logo + search bar only | 🟡 Partial |
 | **Tab Management** | Swipe to cycle, endless loop | Grid list, add/close/switch | 🟡 Different |
