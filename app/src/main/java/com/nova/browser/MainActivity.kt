@@ -39,6 +39,7 @@ import com.nova.browser.ui.screens.DownloadsScreen
 import com.nova.browser.ui.screens.HistoryScreen
 import com.nova.browser.ui.screens.HomeScreen
 import com.nova.browser.ui.screens.IncognitoWebScreen
+import com.nova.browser.ui.screens.CustomSearchEnginesScreen
 import com.nova.browser.ui.screens.NetworkLogScreen
 import com.nova.browser.ui.screens.SettingsScreen
 import com.nova.browser.ui.screens.TabsScreen
@@ -344,7 +345,21 @@ private fun TutuNavigation(
                 viewModel = viewModel,
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToUserScripts = { navController.navigate(Screen.UserScripts.route) },
-                onNavigateToNetworkLog = { navController.navigate(Screen.NetworkLog.route) }
+                onNavigateToNetworkLog = { navController.navigate(Screen.NetworkLog.route) },
+                onNavigateToCustomSearchEngines = { navController.navigate(Screen.CustomSearchEngines.route) }
+            )
+        }
+        
+        composable(Screen.CustomSearchEngines.route) {
+            val viewModel: SettingsViewModel = viewModel(
+                factory = SettingsViewModel.Factory(
+                    settingsRepository = settingsRepository,
+                    bookmarkRepository = bookmarkRepository
+                )
+            )
+            CustomSearchEnginesScreen(
+                viewModel = viewModel,
+                onNavigateBack = { navController.popBackStack() }
             )
         }
         
@@ -401,6 +416,7 @@ sealed class Screen(val route: String) {
     data object Settings : Screen("settings")
     data object UserScripts : Screen("user_scripts")
     data object NetworkLog : Screen("network_log")
+    data object CustomSearchEngines : Screen("custom_search_engines")
     data object Incognito : Screen("incognito/{url}") {
         fun createRoute(url: String) = "incognito/$url"
     }

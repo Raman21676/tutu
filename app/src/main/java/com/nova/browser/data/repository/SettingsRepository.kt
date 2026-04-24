@@ -68,4 +68,8 @@ class SettingsRepository @Inject constructor(
     suspend fun clearAll() {
         dataStore.clearAll()
     }
+
+    suspend fun setCustomSearchEngines(engines: List<com.nova.browser.data.model.CustomSearchEngine>) {
+        dataStore.updateCustomSearchEngines(engines)
+    }
 }

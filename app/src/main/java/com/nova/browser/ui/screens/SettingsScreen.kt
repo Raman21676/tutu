@@ -85,6 +85,7 @@ fun SettingsScreen(
     onNavigateBack: () -> Unit,
     onNavigateToUserScripts: () -> Unit = {},
     onNavigateToNetworkLog: () -> Unit = {},
+    onNavigateToCustomSearchEngines: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val settings by viewModel.settings.collectAsState()
@@ -175,7 +176,14 @@ fun SettingsScreen(
             }
 
             // Search Engine Selector
-            val currentEngine = SearchEngine.fromName(settings.searchEngine)
+            val engineName = settings.searchEngine
+            val currentEngineDisplay = when {
+                engineName.startsWith("CUSTOM:") -> {
+                    val idx = engineName.removePrefix("CUSTOM:").toIntOrNull()
+                    idx?.let { settings.customSearchEngines.getOrNull(it)?.name } ?: "Unknown"
+                }
+                else -> SearchEngine.fromName(engineName).displayName
+            }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -195,7 +203,34 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodyLarge
                     )
                     Text(
-                        text = currentEngine.displayName,
+                        text = currentEngineDisplay,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // Custom Search Engines
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp)
+                    .clickable { onNavigateToCustomSearchEngines() },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(end = 12.dp)
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Custom Search Engines",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = "${settings.customSearchEngines.size} custom engine(s)",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -381,6 +416,7 @@ fun SettingsScreen(
             },
             text = {
                 Column {
+                    // Built-in engines
                     SearchEngine.entries.forEach { engine ->
                         Row(
                             modifier = Modifier
@@ -405,6 +441,35 @@ fun SettingsScreen(
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = engine.displayName,
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        }
+                    }
+                    // Custom engines
+                    settings.customSearchEngines.forEachIndexed { index, engine ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    viewModel.setSearchEngine("CUSTOM:$index")
+                                    showSearchEngineDialog = false
+                                }
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = settings.searchEngine == "CUSTOM:$index",
+                                onClick = {
+                                    viewModel.setSearchEngine("CUSTOM:$index")
+                                    showSearchEngineDialog = false
+                                },
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = CoralRed
+                                )
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = engine.name,
                                 style = MaterialTheme.typography.bodyLarge
                             )
                         }

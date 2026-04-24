@@ -59,6 +59,9 @@ import androidx.compose.ui.unit.dp
 import com.nova.browser.R
 import com.nova.browser.data.local.entity.DefaultBookmarks
 import com.nova.browser.data.model.SearchEngine
+import com.nova.browser.data.model.SearchEngineOption
+import com.nova.browser.data.model.CustomSearchEngine
+import com.nova.browser.data.model.resolveSearchEngine
 import com.nova.browser.ui.components.AppIcon
 import com.nova.browser.ui.components.BookmarkCard
 import com.nova.browser.ui.components.UrlInputField
@@ -108,7 +111,7 @@ fun HomeScreen(
     
     val context = LocalContext.current
     val isFirstLaunch by viewModel.isFirstLaunch.collectAsState()
-    val selectedSearchEngine = SearchEngine.fromName(settings.searchEngine)
+    val selectedSearchEngine = resolveSearchEngine(settings.searchEngine, settings.customSearchEngines)
     
     // QR Scanner launcher
     val qrScanLauncher = rememberQrScanLauncher { scannedUrl ->

@@ -101,6 +101,34 @@ class SettingsViewModel(
             settingsRepository.setFollowSystemTheme(enabled)
         }
     }
+
+    fun addCustomSearchEngine(name: String, url: String) {
+        viewModelScope.launch {
+            val current = _settings.value.customSearchEngines.toMutableList()
+            current.add(com.nova.browser.data.model.CustomSearchEngine(name, url))
+            settingsRepository.setCustomSearchEngines(current)
+        }
+    }
+
+    fun deleteCustomSearchEngine(index: Int) {
+        viewModelScope.launch {
+            val current = _settings.value.customSearchEngines.toMutableList()
+            if (index in current.indices) {
+                current.removeAt(index)
+                settingsRepository.setCustomSearchEngines(current)
+            }
+        }
+    }
+
+    fun updateCustomSearchEngine(index: Int, name: String, url: String) {
+        viewModelScope.launch {
+            val current = _settings.value.customSearchEngines.toMutableList()
+            if (index in current.indices) {
+                current[index] = com.nova.browser.data.model.CustomSearchEngine(name, url)
+                settingsRepository.setCustomSearchEngines(current)
+            }
+        }
+    }
     
     class Factory(
         private val settingsRepository: SettingsRepository,

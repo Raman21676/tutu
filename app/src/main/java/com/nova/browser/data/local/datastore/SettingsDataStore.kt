@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.nova.browser.data.local.entity.Bookmark
 import com.nova.browser.data.local.entity.DefaultBookmarks
+import com.nova.browser.data.model.CustomSearchEngine
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
@@ -45,6 +46,7 @@ class SettingsDataStore(private val context: Context) {
         val AD_BLOCK_ENABLED = booleanPreferencesKey("ad_block_enabled")
         val DOWNLOAD_DIR_URI = stringPreferencesKey("download_dir_uri")
         val DESKTOP_MODE = booleanPreferencesKey("desktop_mode")
+        val CUSTOM_SEARCH_ENGINES = stringPreferencesKey("custom_search_engines")
     }
     
     val settings: Flow<TutuSettings> = context.dataStore.data
@@ -76,7 +78,15 @@ class SettingsDataStore(private val context: Context) {
                     searchEngine = prefs[SEARCH_ENGINE] ?: "GOOGLE",
                     adBlockEnabled = prefs[AD_BLOCK_ENABLED] ?: true,
                     downloadDirUri = prefs[DOWNLOAD_DIR_URI] ?: "",
-                    desktopMode = prefs[DESKTOP_MODE] ?: false
+                    desktopMode = prefs[DESKTOP_MODE] ?: false,
+                    customSearchEngines = prefs[CUSTOM_SEARCH_ENGINES]?.let {
+                        try {
+                            json.decodeFromString(it)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error parsing custom search engines", e)
+                            emptyList()
+                        }
+                    } ?: emptyList()
                 )
             } catch (e: Exception) {
                 Log.e(TAG, "Error creating settings", e)
@@ -236,6 +246,16 @@ class SettingsDataStore(private val context: Context) {
         }
     }
 
+    suspend fun updateCustomSearchEngines(engines: List<CustomSearchEngine>) {
+        try {
+            context.dataStore.edit { prefs ->
+                prefs[CUSTOM_SEARCH_ENGINES] = json.encodeToString(engines)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error saving custom search engines", e)
+        }
+    }
+
     suspend fun clearAll() {
         try {
             context.dataStore.edit { prefs ->
@@ -261,5 +281,6 @@ data class TutuSettings(
     val searchEngine: String = "GOOGLE",
     val adBlockEnabled: Boolean = true,
     val downloadDirUri: String = "",
-    val desktopMode: Boolean = false
+    val desktopMode: Boolean = false,
+    val customSearchEngines: List<CustomSearchEngine> = emptyList()
 )

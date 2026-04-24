@@ -4,7 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.webkit.URLUtil
-import com.nova.browser.data.model.SearchEngine
+import com.nova.browser.data.model.SearchEngineOption
 
 fun String.isValidUrl(): Boolean {
     return URLUtil.isValidUrl(this) || 
@@ -33,7 +33,7 @@ fun String.isSearchQuery(): Boolean {
  * Build a URL from user input. If the input looks like a search query,
  * it uses the selected search engine. Otherwise treats it as a URL.
  */
-fun String.buildUrl(httpsEnabled: Boolean = true, searchEngine: SearchEngine = SearchEngine.GOOGLE): String {
+fun String.buildUrl(httpsEnabled: Boolean = true, searchEngine: SearchEngineOption = com.nova.browser.data.model.SearchEngine.GOOGLE): String {
     val trimmed = this.trim()
     return when {
         // Already has protocol
