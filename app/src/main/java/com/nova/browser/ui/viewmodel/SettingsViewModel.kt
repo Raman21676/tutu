@@ -89,6 +89,18 @@ class SettingsViewModel(
             settingsRepository.setDesktopMode(enabled)
         }
     }
+
+    fun setDarkMode(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setDarkMode(enabled)
+        }
+    }
+
+    fun setFollowSystemTheme(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setFollowSystemTheme(enabled)
+        }
+    }
     
     class Factory(
         private val settingsRepository: SettingsRepository,

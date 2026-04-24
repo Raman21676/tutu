@@ -703,19 +703,7 @@ private fun openFileLocation(context: Context, item: DownloadEntity) {
             Log.d("DownloadsScreen", "file:// VIEW failed: ${e.message}")
         }
 
-        // ── Strategy 5: System Downloads app ──
-        try {
-            val intent = Intent(DownloadManager.ACTION_VIEW_DOWNLOADS).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            context.startActivity(intent)
-            Log.d("DownloadsScreen", "Opened system Downloads app")
-            return
-        } catch (e: Exception) {
-            Log.d("DownloadsScreen", "System Downloads app failed: ${e.message}")
-        }
-
-        // ── Strategy 6: Open the file directly so user can "show in folder" from viewer ──
+        // ── Strategy 5: Open the file directly — most useful fallback on ColorOS ──
         try {
             val mimeType = item.mimeType.takeIf { it.isNotEmpty() }
                 ?: getMimeTypeFromFileName(file.name)
@@ -732,11 +720,23 @@ private fun openFileLocation(context: Context, item: DownloadEntity) {
             }
             if (intent.resolveActivity(context.packageManager) != null) {
                 context.startActivity(intent)
-                Log.d("DownloadsScreen", "Opened file directly as fallback")
+                Log.d("DownloadsScreen", "Opened file directly")
                 return
             }
         } catch (e: Exception) {
-            Log.d("DownloadsScreen", "Open file fallback failed: ${e.message}")
+            Log.d("DownloadsScreen", "Open file directly failed: ${e.message}")
+        }
+
+        // ── Strategy 6: System Downloads app ──
+        try {
+            val intent = Intent(DownloadManager.ACTION_VIEW_DOWNLOADS).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            Log.d("DownloadsScreen", "Opened system Downloads app")
+            return
+        } catch (e: Exception) {
+            Log.d("DownloadsScreen", "System Downloads app failed: ${e.message}")
         }
 
         // ── Final Fallback: copy path to clipboard ──

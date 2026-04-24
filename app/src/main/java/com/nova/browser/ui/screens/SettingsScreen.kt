@@ -23,12 +23,14 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.RotateRight
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Computer
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.RememberMe
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SettingsBrightness
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -152,6 +154,22 @@ fun SettingsScreen(
                 title = stringResource(R.string.dialog_remember_choice),
                 icon = Icons.Default.RememberMe
             )
+
+            ToggleSwitch(
+                checked = settings.followSystemTheme,
+                onCheckedChange = { viewModel.setFollowSystemTheme(it) },
+                title = "Follow System Theme",
+                icon = Icons.Default.SettingsBrightness
+            )
+
+            if (!settings.followSystemTheme) {
+                ToggleSwitch(
+                    checked = settings.darkMode,
+                    onCheckedChange = { viewModel.setDarkMode(it) },
+                    title = "Dark Mode",
+                    icon = Icons.Default.DarkMode
+                )
+            }
 
             // Search Engine Selector
             val currentEngine = SearchEngine.fromName(settings.searchEngine)

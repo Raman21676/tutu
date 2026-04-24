@@ -20,19 +20,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.Fullscreen
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.ScreenRotation
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.SettingsBrightness
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Tab
-import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.VisibilityOff
 
 import androidx.compose.material3.BasicAlertDialog
@@ -67,7 +61,6 @@ import com.nova.browser.data.local.entity.DefaultBookmarks
 import com.nova.browser.data.model.SearchEngine
 import com.nova.browser.ui.components.AppIcon
 import com.nova.browser.ui.components.BookmarkCard
-import com.nova.browser.ui.components.ToggleSwitch
 import com.nova.browser.ui.components.UrlInputField
 import com.nova.browser.ui.theme.CoralRed
 import com.nova.browser.ui.theme.TutuTheme
@@ -270,55 +263,6 @@ fun HomeScreen(
             onScanQr = { qrScanLauncher.launch() },
             placeholder = stringResource(R.string.hint_enter_url)
         )
-        
-        Spacer(modifier = Modifier.height(24.dp))
-        
-        // Toggles - HTTPS, Fullscreen, Auto-Rotate
-        ToggleSwitch(
-            checked = settings.httpsEnabled,
-            onCheckedChange = { viewModel.setHttpsEnabled(it) },
-            title = "HTTPS",
-            icon = Icons.Default.Lock
-        )
-        
-        ToggleSwitch(
-            checked = settings.fullscreen,
-            onCheckedChange = { viewModel.setFullscreen(it) },
-            title = stringResource(R.string.toggle_fullscreen),
-            icon = Icons.Default.Fullscreen
-        )
-        
-        ToggleSwitch(
-            checked = settings.autoRotate,
-            onCheckedChange = { viewModel.setAutoRotate(it) },
-            title = stringResource(R.string.toggle_auto_rotate),
-            icon = Icons.Default.ScreenRotation
-        )
-        
-        // Theme Settings
-        ToggleSwitch(
-            checked = settings.followSystemTheme,
-            onCheckedChange = { viewModel.setFollowSystemTheme(it) },
-            title = "Follow System Theme",
-            icon = Icons.Default.SettingsBrightness
-        )
-        
-        // Ad Blocker Toggle
-        ToggleSwitch(
-            checked = settings.adBlockEnabled,
-            onCheckedChange = { viewModel.setAdBlockEnabled(it) },
-            title = "Block Ads & Trackers",
-            icon = Icons.Default.Shield
-        )
-        
-        if (!settings.followSystemTheme) {
-            ToggleSwitch(
-                checked = settings.darkMode,
-                onCheckedChange = { viewModel.setDarkMode(it) },
-                title = "Dark Mode",
-                icon = Icons.Default.DarkMode
-            )
-        }
         
         Spacer(modifier = Modifier.height(24.dp))
         
