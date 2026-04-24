@@ -739,72 +739,12 @@ private fun openFileLocation(context: Context, item: DownloadEntity) {
             Log.d("DownloadsScreen", "file:// VIEW failed: ${e.message}")
         }
 
-        // ── Strategy 5: Open file directly with explicit URI permission grants ──
-        try {
-            val mimeType = when {
-                file.name.lowercase().endsWith(".apk") -> "application/vnd.android.package-archive"
-                item.mimeType.isNotEmpty() && item.mimeType != "application/octet-stream" -> item.mimeType
-                else -> getMimeTypeFromFileName(file.name) ?: "*/*"
-            }
-            val uri = FileProvider.getUriForFile(
-                context, "${context.packageName}.fileprovider", file
-            )
-            val viewIntent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, mimeType)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            // Explicitly grant permission to every app before showing chooser
-            context.packageManager
-                .queryIntentActivities(viewIntent, PackageManager.MATCH_DEFAULT_ONLY)
-                .forEach { info ->
-                    context.grantUriPermission(
-                        info.activityInfo.packageName,
-                        uri,
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION
-                    )
-                }
-            context.startActivity(Intent.createChooser(viewIntent, "Open with"))
-            Log.d("DownloadsScreen", "Opened file with explicit URI grants")
-            return
-        } catch (e: Exception) {
-            Log.w("DownloadsScreen", "FileProvider+grants failed: ${e.message}")
-            // Fallback: file:// URI
-            try {
-                val mimeType = when {
-                    file.name.lowercase().endsWith(".apk") -> "application/vnd.android.package-archive"
-                    else -> getMimeTypeFromFileName(file.name) ?: "*/*"
-                }
-                @Suppress("DEPRECATION")
-                val intent = Intent(Intent.ACTION_VIEW).apply {
-                    setDataAndType(Uri.fromFile(file), mimeType)
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                context.startActivity(Intent.createChooser(intent, "Open with"))
-                Log.d("DownloadsScreen", "Opened file via file:// fallback")
-                return
-            } catch (e2: Exception) {
-                Log.w("DownloadsScreen", "file:// fallback failed: ${e2.message}")
-            }
-        }
-
-        // ── Strategy 6: System Downloads app ──
-        try {
-            val intent = Intent(DownloadManager.ACTION_VIEW_DOWNLOADS).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            context.startActivity(intent)
-            Log.d("DownloadsScreen", "Opened system Downloads app")
-            return
-        } catch (e: Exception) {
-            Log.d("DownloadsScreen", "System Downloads app failed: ${e.message}")
-        }
-
-        // ── Final Fallback: copy path to clipboard ──
+        // ── Final fallback: copy path (ColorOS cannot open specific folders via intent) ──
+        val path = parentDir.absolutePath
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-        val clip = android.content.ClipData.newPlainText("File Location", parentDir.absolutePath)
-        clipboard.setPrimaryClip(clip)
-        Toast.makeText(context, "Copied path: ${parentDir.absolutePath}", Toast.LENGTH_LONG).show()
+        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Download path", path))
+        Toast.makeText(context, "Saved in: $path\n(Path copied to clipboard)", Toast.LENGTH_LONG).show()
+        Log.d("DownloadsScreen", "Copied folder path to clipboard: $path")
 
     } catch (e: Exception) {
         Log.e("DownloadsScreen", "Error opening location: ${e.message}")
