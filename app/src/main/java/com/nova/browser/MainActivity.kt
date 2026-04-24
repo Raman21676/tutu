@@ -34,6 +34,8 @@ import com.nova.browser.data.repository.TabManager
 import com.nova.browser.di.AppModule
 import com.nova.browser.domain.repository.HistoryRepository
 import com.nova.browser.domain.repository.DownloadRepository
+import com.nova.browser.domain.repository.SiteSettingsRepository
+import com.nova.browser.domain.repository.UserScriptRepository
 import com.nova.browser.ui.screens.BookmarksScreen
 import com.nova.browser.ui.screens.DownloadsScreen
 import com.nova.browser.ui.screens.HistoryScreen
@@ -97,6 +99,12 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var downloadRepository: DownloadRepository
 
+    @Inject
+    lateinit var siteSettingsRepository: com.nova.browser.domain.repository.SiteSettingsRepository
+
+    @Inject
+    lateinit var userScriptRepository: com.nova.browser.domain.repository.UserScriptRepository
+
     private lateinit var settingsRepository: com.nova.browser.data.repository.SettingsRepository
     private lateinit var bookmarkRepository: com.nova.browser.data.repository.BookmarkRepository
 
@@ -138,6 +146,8 @@ class MainActivity : ComponentActivity() {
                         bookmarkRepository = bookmarkRepository,
                         historyRepository = historyRepository,
                         downloadRepository = downloadRepository,
+                        siteSettingsRepository = siteSettingsRepository,
+                        userScriptRepository = userScriptRepository,
                         initialUrl = intentUrl
                     )
                 }
@@ -152,6 +162,8 @@ private fun TutuNavigation(
     bookmarkRepository: com.nova.browser.data.repository.BookmarkRepository,
     historyRepository: HistoryRepository,
     downloadRepository: DownloadRepository,
+    siteSettingsRepository: SiteSettingsRepository,
+    userScriptRepository: UserScriptRepository,
     initialUrl: String? = null
 ) {
     val navController = rememberNavController()
@@ -337,7 +349,11 @@ private fun TutuNavigation(
             val viewModel: SettingsViewModel = viewModel(
                 factory = SettingsViewModel.Factory(
                     settingsRepository = settingsRepository,
-                    bookmarkRepository = bookmarkRepository
+                    bookmarkRepository = bookmarkRepository,
+                    historyRepository = historyRepository,
+                    siteSettingsRepository = siteSettingsRepository,
+                    userScriptRepository = userScriptRepository,
+                    context = androidx.compose.ui.platform.LocalContext.current
                 )
             )
 
@@ -354,7 +370,11 @@ private fun TutuNavigation(
             val viewModel: SettingsViewModel = viewModel(
                 factory = SettingsViewModel.Factory(
                     settingsRepository = settingsRepository,
-                    bookmarkRepository = bookmarkRepository
+                    bookmarkRepository = bookmarkRepository,
+                    historyRepository = historyRepository,
+                    siteSettingsRepository = siteSettingsRepository,
+                    userScriptRepository = userScriptRepository,
+                    context = androidx.compose.ui.platform.LocalContext.current
                 )
             )
             CustomSearchEnginesScreen(

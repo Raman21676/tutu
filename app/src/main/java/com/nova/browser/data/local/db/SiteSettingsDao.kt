@@ -5,6 +5,9 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface SiteSettingsDao {
+    @Query("SELECT * FROM site_settings")
+    suspend fun getAll(): List<SiteSettingsEntity>
+
     @Query("SELECT * FROM site_settings WHERE domain = :domain LIMIT 1")
     suspend fun getSettingsForDomain(domain: String): SiteSettingsEntity?
 

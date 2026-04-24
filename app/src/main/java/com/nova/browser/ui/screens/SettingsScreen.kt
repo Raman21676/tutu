@@ -6,6 +6,8 @@ import android.os.Build
 import android.os.Environment
 import android.provider.Settings
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -33,6 +35,8 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SettingsBrightness
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.TravelExplore
+import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -94,6 +98,15 @@ fun SettingsScreen(
     var showSearchEngineDialog by remember { mutableStateOf(false) }
     var showDirPicker by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val backupResult by viewModel.backupResult.collectAsState()
+
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let { viewModel.importData(it) }
+    }
+
+    var showImportPicker by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -337,6 +350,68 @@ fun SettingsScreen(
                 modifier = Modifier.padding(top = 8.dp, start = 16.dp)
             )
 
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Export Data
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp)
+                    .clickable { viewModel.exportData(context) },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.FileDownload,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(end = 12.dp)
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Export Data",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = "Backup settings, bookmarks, history, and scripts",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // Import Data
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp)
+                    .clickable {
+                        try {
+                            importLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
+                        } catch (e: Exception) {
+                            showImportPicker = true
+                        }
+                    },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.FileUpload,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(end = 12.dp)
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Import Data",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = "Restore from a backup file",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(24.dp))
             HorizontalDivider()
             Spacer(modifier = Modifier.height(24.dp))
@@ -512,6 +587,61 @@ fun SettingsScreen(
             dismissButton = {
                 TextButton(onClick = { showClearDataDialog = false }) {
                     Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Import File Picker Dialog (fallback)
+    if (showImportPicker) {
+        val backupFiles = remember {
+            val dir = java.io.File(android.os.Environment.getExternalStorageDirectory(), "Nova Downloads")
+            dir.listFiles { _, name -> name.startsWith("nova_backup") && name.endsWith(".json") }
+                ?.sortedByDescending { it.lastModified() }
+                ?.map { it.name to android.net.Uri.fromFile(it) }
+                ?: emptyList()
+        }
+        AlertDialog(
+            onDismissRequest = { showImportPicker = false },
+            title = { Text("Select Backup File") },
+            text = {
+                Column {
+                    if (backupFiles.isEmpty()) {
+                        Text("No backup files found in Nova Downloads folder.")
+                    } else {
+                        backupFiles.forEach { (name, uri) ->
+                            Text(
+                                text = name,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        viewModel.importData(uri)
+                                        showImportPicker = false
+                                    }
+                                    .padding(vertical = 12.dp),
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showImportPicker = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Backup Result Dialog
+    if (backupResult != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.onBackupResultAcknowledged() },
+            title = { Text("Backup") },
+            text = { Text(backupResult!!) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.onBackupResultAcknowledged() }) {
+                    Text("OK")
                 }
             }
         )

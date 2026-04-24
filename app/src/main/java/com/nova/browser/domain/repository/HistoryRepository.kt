@@ -48,5 +48,9 @@ class HistoryRepository @Inject constructor(
         historyDao.deleteAll()
     }
 
+    suspend fun insertHistory(entity: HistoryEntity) {
+        historyDao.insert(entity)
+    }
+
     fun getHistoryCount(): Flow<Int> = historyDao.getHistoryCount()
 }

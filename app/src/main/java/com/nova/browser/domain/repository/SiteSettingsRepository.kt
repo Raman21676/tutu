@@ -10,6 +10,8 @@ import javax.inject.Singleton
 class SiteSettingsRepository @Inject constructor(
     private val siteSettingsDao: SiteSettingsDao
 ) {
+    suspend fun getAll(): List<SiteSettingsEntity> = siteSettingsDao.getAll()
+
     suspend fun getSettingsForDomain(domain: String): SiteSettingsEntity? {
         return siteSettingsDao.getSettingsForDomain(domain)
     }
