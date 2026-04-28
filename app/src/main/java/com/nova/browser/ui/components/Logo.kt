@@ -19,10 +19,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.nova.browser.R
 import com.nova.browser.ui.theme.CoralRed
-import com.nova.browser.ui.theme.TutuTheme
+import com.nova.browser.ui.theme.NovaTheme
 
 @Composable
-fun TutuLogo(
+fun NovaLogo(
     modifier: Modifier = Modifier,
     size: Int = 120,
     color: Color = CoralRed,
@@ -43,7 +43,7 @@ fun TutuLogo(
         // Since we don't have actual vector assets yet, we'll use text-based logo
         // In production, replace with actual dodo bird vector graphic
         TextLogo(
-            text = "tutu",
+            text = "nova",
             color = color
         )
     }
@@ -51,7 +51,7 @@ fun TutuLogo(
 
 @Composable
 private fun TextLogo(
-    text: String = "tutu",
+    text: String = "nova",
     color: Color = CoralRed
 ) {
     androidx.compose.material3.Text(
@@ -65,8 +65,8 @@ private fun TextLogo(
 
 @Preview
 @Composable
-fun TutuLogoPreview() {
-    TutuTheme {
-        TutuLogo()
+fun NovaLogoPreview() {
+    NovaTheme {
+        NovaLogo()
     }
 }

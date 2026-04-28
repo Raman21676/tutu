@@ -16,7 +16,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.nova.browser.ui.theme.CoralRed
-import com.nova.browser.ui.theme.TutuTheme
+import com.nova.browser.ui.theme.NovaTheme
 
 @Composable
 fun LinearProgressIndicatorCustom(
@@ -60,7 +60,7 @@ fun IndeterminateProgressIndicator(
 @Preview
 @Composable
 fun ProgressIndicatorPreview() {
-    TutuTheme {
+    NovaTheme {
         LinearProgressIndicatorCustom(
             progress = 0.6f,
             modifier = Modifier.fillMaxWidth()
@@ -71,7 +71,7 @@ fun ProgressIndicatorPreview() {
 @Preview
 @Composable
 fun IndeterminateProgressIndicatorPreview() {
-    TutuTheme {
+    NovaTheme {
         IndeterminateProgressIndicator(
             modifier = Modifier.fillMaxWidth()
         )

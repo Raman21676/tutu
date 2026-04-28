@@ -30,13 +30,16 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Surface
 import androidx.compose.material.icons.Icons
@@ -295,35 +298,50 @@ fun WebScreen(
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
-            if (!fullscreen) {
-                Column {
-                    TopAppBar(
-                        title = {
-                            Column {
-                                Text(
-                                    text = state.title.takeIf { it.isNotBlank() } ?: "Loading...",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = state.url.getDomainName(),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        },
-                        navigationIcon = {
-                            IconButton(onClick = onNavigateBack) {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = "Close"
-                                )
-                            }
-                        },
-                        actions = {
+            Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.surface,
+                    shadowElevation = 4.dp
+                ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .height(56.dp)
+                        .padding(horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    // Left: close button + title
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Close",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = state.title.takeIf { it.isNotBlank() } ?: "Loading...",
+                                style = MaterialTheme.typography.titleMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = state.url.getDomainName(),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                    // Right actions
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                             // Tabs button — always visible
                             IconButton(onClick = onNavigateToTabs) {
                                 Icon(
@@ -517,62 +535,6 @@ fun WebScreen(
                                     }
                                 )
                             }
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.background
-                        )
-                    )
-                    
-                    when {
-                        state.isLoading && state.progress < 100 -> {
-                            LinearProgressIndicatorCustom(
-                                progress = state.progress / 100f,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                        state.isLoading -> {
-                            IndeterminateProgressIndicator(
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                    }
-
-                    // Find-in-Page bar
-                    if (showFindBar) {
-                        androidx.compose.material3.OutlinedTextField(
-                            value = findQuery,
-                            onValueChange = { q ->
-                                findQuery = q
-                                if (q.isNotBlank()) webView?.findAllAsync(q)
-                                else webView?.clearMatches()
-                            },
-                            placeholder = { Text("Find in page...") },
-                            singleLine = true,
-                            leadingIcon = {
-                                Icon(Icons.Default.Search, contentDescription = null)
-                            },
-                            trailingIcon = {
-                                Row {
-                                    IconButton(onClick = { webView?.findNext(false) }) {
-                                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Previous")
-                                    }
-                                    IconButton(onClick = { webView?.findNext(true) }) {
-                                        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Next")
-                                    }
-                                    IconButton(onClick = {
-                                        showFindBar = false
-                                        findQuery = ""
-                                        webView?.clearMatches()
-                                    }) {
-                                        Icon(Icons.Default.Close, contentDescription = "Close")
-                                    }
-                                }
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                            shape = MaterialTheme.shapes.large
-                        )
                     }
                 }
             }
@@ -595,14 +557,72 @@ fun WebScreen(
         }
     ) { paddingValues ->
         // CRITICAL FIX: In fullscreen mode, don't apply padding
-        val boxModifier = if (fullscreen) {
+        val contentModifier = if (fullscreen) {
             Modifier.fillMaxSize()
         } else {
             Modifier.fillMaxSize().padding(paddingValues)
         }
-        
-        Box(modifier = boxModifier) {
+
+        Column(modifier = contentModifier) {
+            if (!fullscreen) {
+                // Loading progress indicator below top bar
+                when {
+                    state.isLoading && state.progress < 100 -> {
+                        LinearProgressIndicatorCustom(
+                            progress = state.progress / 100f,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    state.isLoading -> {
+                        IndeterminateProgressIndicator(
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+
+                // Find-in-Page bar
+                if (showFindBar) {
+                    androidx.compose.material3.OutlinedTextField(
+                        value = findQuery,
+                        onValueChange = { q ->
+                            findQuery = q
+                            if (q.isNotBlank()) webView?.findAllAsync(q)
+                            else webView?.clearMatches()
+                        },
+                        placeholder = { Text("Find in page...") },
+                        singleLine = true,
+                        leadingIcon = {
+                            Icon(Icons.Default.Search, contentDescription = null)
+                        },
+                        trailingIcon = {
+                            Row {
+                                IconButton(onClick = { webView?.findNext(false) }) {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Previous")
+                                }
+                                IconButton(onClick = { webView?.findNext(true) }) {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Next")
+                                }
+                                IconButton(onClick = {
+                                    showFindBar = false
+                                    findQuery = ""
+                                    webView?.clearMatches()
+                                }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Close")
+                                }
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        shape = MaterialTheme.shapes.large
+                    )
+                }
+            }
+
             AndroidView(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
                 factory = { ctx ->
                     WebView(ctx).apply {
                         
@@ -1024,7 +1044,6 @@ fun WebScreen(
                         loadUrl(state.url)
                     }
                 },
-                modifier = Modifier.fillMaxSize(),
                 update = { wv ->
                     webView = wv
                     // Apply desktop/mobile UA switch reactively when the setting changes

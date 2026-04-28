@@ -47,7 +47,7 @@ import com.nova.browser.ui.screens.SettingsScreen
 import com.nova.browser.ui.screens.TabsScreen
 import com.nova.browser.ui.screens.UserScriptsScreen
 import com.nova.browser.ui.screens.WebScreen
-import com.nova.browser.ui.theme.TutuTheme
+import com.nova.browser.ui.theme.NovaTheme
 import com.nova.browser.ui.viewmodel.HomeViewModel
 import com.nova.browser.ui.viewmodel.SettingsViewModel
 import com.nova.browser.ui.viewmodel.ThemeViewModel
@@ -136,7 +136,7 @@ class MainActivity : ComponentActivity() {
                 else -> themeState.darkMode
             }
 
-            TutuTheme(darkTheme = darkTheme) {
+            NovaTheme(darkTheme = darkTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background

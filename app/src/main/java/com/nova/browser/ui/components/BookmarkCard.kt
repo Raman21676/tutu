@@ -33,7 +33,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.nova.browser.data.local.entity.Bookmark
-import com.nova.browser.ui.theme.TutuTheme
+import com.nova.browser.ui.theme.NovaTheme
 
 @Composable
 fun BookmarkCard(
@@ -119,7 +119,7 @@ fun BookmarkCard(
 @Preview
 @Composable
 fun BookmarkCardPreview() {
-    TutuTheme {
+    NovaTheme {
         BookmarkCard(
             bookmark = Bookmark(
                 id = "1",

@@ -76,7 +76,7 @@ import com.nova.browser.R
 import com.nova.browser.data.model.SearchEngine
 import com.nova.browser.ui.components.ToggleSwitch
 import com.nova.browser.ui.theme.CoralRed
-import com.nova.browser.ui.theme.TutuTheme
+import com.nova.browser.ui.theme.NovaTheme
 import com.nova.browser.ui.viewmodel.SettingsViewModel
 import com.nova.browser.util.DownloadDirHelper
 import com.nova.browser.util.DownloadDirPreference
@@ -956,7 +956,7 @@ private fun SectionTitle(title: String) {
 @Preview
 @Composable
 fun SettingsScreenPreview() {
-    TutuTheme {
+    NovaTheme {
         Text("Settings Preview")
     }
 }

@@ -31,7 +31,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.nova.browser.ui.theme.TutuTheme
+import com.nova.browser.ui.theme.NovaTheme
 
 @Composable
 fun UrlInputField(
@@ -130,7 +130,7 @@ fun UrlInputField(
 @Preview
 @Composable
 fun UrlInputFieldPreview() {
-    TutuTheme {
+    NovaTheme {
         UrlInputField(
             value = "",
             onValueChange = {},
@@ -144,7 +144,7 @@ fun UrlInputFieldPreview() {
 @Preview
 @Composable
 fun UrlInputFieldFilledPreview() {
-    TutuTheme {
+    NovaTheme {
         UrlInputField(
             value = "youtube.com",
             onValueChange = {},

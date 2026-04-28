@@ -33,7 +33,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.nova.browser.ui.theme.CoralRed
-import com.nova.browser.ui.theme.TutuTheme
+import com.nova.browser.ui.theme.NovaTheme
 
 @Composable
 fun ToggleSwitch(
@@ -138,7 +138,7 @@ fun ToggleSwitch(
 @Preview
 @Composable
 fun ToggleSwitchOnPreview() {
-    TutuTheme {
+    NovaTheme {
         ToggleSwitch(
             checked = true,
             onCheckedChange = {},
@@ -150,7 +150,7 @@ fun ToggleSwitchOnPreview() {
 @Preview
 @Composable
 fun ToggleSwitchOffPreview() {
-    TutuTheme {
+    NovaTheme {
         ToggleSwitch(
             checked = false,
             onCheckedChange = {},

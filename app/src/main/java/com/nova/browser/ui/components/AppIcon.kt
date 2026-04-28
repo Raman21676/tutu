@@ -12,7 +12,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.nova.browser.R
-import com.nova.browser.ui.theme.TutuTheme
+import com.nova.browser.ui.theme.NovaTheme
 
 @Composable
 fun AppIcon(
@@ -27,8 +27,8 @@ fun AppIcon(
     )
     
     Image(
-        painter = painterResource(id = R.mipmap.ic_launcher_foreground),
-        contentDescription = "Tutu Logo",
+        painter = painterResource(id = R.drawable.tutu_logo),
+        contentDescription = "NOVA Logo",
         modifier = modifier
             .size(size.dp)
             .scale(scale)
@@ -38,7 +38,7 @@ fun AppIcon(
 @Preview
 @Composable
 fun AppIconPreview() {
-    TutuTheme {
+    NovaTheme {
         AppIcon()
     }
 }

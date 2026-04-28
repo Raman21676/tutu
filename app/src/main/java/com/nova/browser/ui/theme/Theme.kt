@@ -69,7 +69,7 @@ private val LightColorScheme = lightColorScheme(
 )
 
 @Composable
-fun TutuTheme(
+fun NovaTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = false, // Disabled for consistent branding
     content: @Composable () -> Unit

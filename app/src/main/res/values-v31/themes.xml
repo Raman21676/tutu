@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- For Android 12+ (API 31+) with native splash screen support -->
-    <style name="Theme.Tutu" parent="android:Theme.Material.Light.NoActionBar">
+    <style name="Theme.Nova" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">false</item>

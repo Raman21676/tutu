@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -66,7 +67,7 @@ import com.nova.browser.ui.components.AppIcon
 import com.nova.browser.ui.components.BookmarkCard
 import com.nova.browser.ui.components.UrlInputField
 import com.nova.browser.ui.theme.CoralRed
-import com.nova.browser.ui.theme.TutuTheme
+import com.nova.browser.ui.theme.NovaTheme
 import com.nova.browser.ui.viewmodel.HomeViewModel
 import com.nova.browser.util.buildUrl
 import com.nova.browser.util.openInExternalBrowser
@@ -134,6 +135,7 @@ fun HomeScreen(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
+            .statusBarsPadding()
             .padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -238,7 +240,7 @@ fun HomeScreen(
         )
         
         Text(
-            text = "TuTu",
+            text = "NOVA",
             style = MaterialTheme.typography.headlineLarge.copy(
                 fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
             ),
@@ -573,7 +575,7 @@ private fun AddBookmarkDialog(
 @Preview
 @Composable
 fun HomeScreenPreview() {
-    TutuTheme {
+    NovaTheme {
         Text("Home Screen Preview")
     }
 }

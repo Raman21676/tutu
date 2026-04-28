@@ -8,11 +8,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import com.nova.browser.ui.theme.CoralRed
-import com.nova.browser.ui.theme.TutuTheme
+import com.nova.browser.ui.theme.NovaTheme
 
 @Composable
 fun TextLogo(
-    text: String = "tutu",
+    text: String = "nova",
     color: Color = CoralRed,
     modifier: Modifier = Modifier
 ) {
@@ -29,7 +29,7 @@ fun TextLogo(
 @Preview
 @Composable
 fun TextLogoPreview() {
-    TutuTheme {
+    NovaTheme {
         TextLogo()
     }
 }
