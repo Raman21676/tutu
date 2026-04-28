@@ -298,7 +298,8 @@ fun WebScreen(
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
-            Surface(
+            if (!fullscreen) {
+                Surface(
                     modifier = Modifier.fillMaxWidth(),
                     color = MaterialTheme.colorScheme.surface,
                     shadowElevation = 4.dp
@@ -537,6 +538,7 @@ fun WebScreen(
                             }
                     }
                 }
+            }
             }
         },
         bottomBar = {
