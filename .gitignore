@@ -39,3 +39,19 @@ google-services.json
 *.session-log.md
 .gradle-home/
 session-logs/
+
+# Session screenshots and test artifacts (private)
+*.session-screenshot.png
+/current.png
+/current_screen.png
+/debug_*.png
+/fs_test.png
+/fullscreen_issue.png
+/home_*.png
+/incog_*.png
+/nova_*.png
+/settings_screen.png
+/test_*.png
+/via-browser.html
+/web_*.png
+/window_dump*.xml
