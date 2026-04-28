@@ -190,7 +190,7 @@ fun IncognitoWebScreen(
                             javaScriptEnabled = true
                             domStorageEnabled = true
                             databaseEnabled = true
-                            cacheMode = WebSettings.LOAD_NO_CACHE
+                            cacheMode = WebSettings.LOAD_DEFAULT
                             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                             userAgentString = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
                             allowFileAccess = true
@@ -204,9 +204,9 @@ fun IncognitoWebScreen(
                             displayZoomControls = false
                             mediaPlaybackRequiresUserGesture = false
                             
-                            // Handle window.open()
-                            setSupportMultipleWindows(true)
-                            javaScriptCanOpenWindowsAutomatically = true
+                            // Disable multiple windows in incognito (no onCreateWindow handler)
+                            setSupportMultipleWindows(false)
+                            javaScriptCanOpenWindowsAutomatically = false
                             
                             // Enable WebGL and media features
                             setNeedInitialFocus(true)
@@ -218,12 +218,16 @@ fun IncognitoWebScreen(
                             // Enable hardware acceleration for smooth video
                             setRenderPriority(WebSettings.RenderPriority.HIGH)
                             
+                            // Force hardware rendering layer
+                            setLayerType(View.LAYER_TYPE_HARDWARE, null)
+                            
                             // Text scaling for better display
                             textZoom = 100
                         }
                         
-                        // Disable cookies in incognito mode
-                        CookieManager.getInstance().setAcceptCookie(false)
+                        // Incognito: clear existing cookies before load, but DON'T disable globally
+                        CookieManager.getInstance().removeAllCookies(null)
+                        CookieManager.getInstance().flush()
                         
                         webViewClient = object : WebViewClient() {
                             private val TAG = "IncognitoWebView"
@@ -354,6 +358,7 @@ fun IncognitoWebScreen(
                     }
                 },
                 update = { view ->
+                    webView = view
                     // Reload if URL changed
                     if (view.url != state.url && state.url.isNotBlank()) {
                         view.loadUrl(state.url)
